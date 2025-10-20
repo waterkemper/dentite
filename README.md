@@ -1,4 +1,4 @@
-# ðŸ¦· Dentite - Dental Benefits Tracker
+# 🦷 Dentite - Dental Benefits Tracker
 
 **Prevent thousands in lost revenue by tracking dental insurance benefits before they expire.**
 
@@ -6,7 +6,7 @@ Dentite is a full-stack SaaS platform that helps dental practices automatically 
 
 ---
 
-## ðŸŽ¯ Problem & Solution
+## 💡 Problem & Solution
 
 **Problem:** Dental practices lose thousands every year because patients don't use their insurance benefits before they expire (typically December 31st).
 
@@ -19,7 +19,7 @@ Dentite is a full-stack SaaS platform that helps dental practices automatically 
 
 ---
 
-## ðŸ’° Business Model
+## 💰 Business Model
 
 - **$200-$300/month** per practice
 - Optional **booking fees** for scheduled appointments
@@ -27,9 +27,9 @@ Dentite is a full-stack SaaS platform that helps dental practices automatically 
 
 ---
 
-## ðŸš€ Features
+## 🚀 Features
 
-### âœ… MVP Features (Implemented)
+### ✅ MVP Features (Implemented)
 
 1. **OpenDental Integration**
    - Sync patient data, insurance details, and claims
