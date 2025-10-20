@@ -20,12 +20,20 @@ interface SequenceBuilderProps {
 export const SequenceBuilder = ({ steps, onChange }: SequenceBuilderProps) => {
   const [editingStep, setEditingStep] = useState<number | null>(null);
 
+  const validateSteps = (stepsToValidate: SequenceStep[]): boolean => {
+    return stepsToValidate.every(step => 
+      step.name.trim() !== '' && 
+      step.messageTemplate.trim() !== '' &&
+      step.delayValue >= 0
+    );
+  };
+
   const addStep = () => {
     const newStep: SequenceStep = {
       stepNumber: steps.length + 1,
       name: `Step ${steps.length + 1}`,
       messageType: 'email',
-      messageTemplate: '',
+      messageTemplate: 'Hi {firstName}, you have {amount} in dental benefits expiring on {expirationDate}. Don\'t let them go to waste!',
       delayType: 'fixed_days',
       delayValue: 7,
     };
@@ -281,25 +289,38 @@ export const SequenceBuilder = ({ steps, onChange }: SequenceBuilderProps) => {
           <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
             <Calendar className="w-4 h-4" />
             Sequence Timeline
+            {!validateSteps(steps) && (
+              <span className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded">
+                Some steps need completion
+              </span>
+            )}
           </h4>
           <div className="space-y-2">
-            {steps.map((step, index) => (
-              <div key={index} className="flex items-center gap-3 text-sm">
-                <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold">
-                  {step.stepNumber}
+            {steps.map((step, index) => {
+              const isValid = step.name.trim() !== '' && step.messageTemplate.trim() !== '';
+              return (
+                <div key={index} className="flex items-center gap-3 text-sm">
+                  <div className={`w-6 h-6 rounded-full text-white flex items-center justify-center text-xs font-bold ${
+                    isValid ? 'bg-primary' : 'bg-red-500'
+                  }`}>
+                    {step.stepNumber}
+                  </div>
+                  <div className="flex-1">
+                    <span className="font-medium">{step.name || 'Unnamed Step'}</span>
+                    <span className="text-gray-500 mx-2">•</span>
+                    <span className="text-gray-600">{getDelayDescription(step)}</span>
+                    {!isValid && (
+                      <span className="text-red-500 text-xs ml-2">⚠️ Incomplete</span>
+                    )}
+                  </div>
+                  {step.messageType === 'sms' ? (
+                    <Smartphone className="w-4 h-4 text-gray-400" />
+                  ) : (
+                    <Mail className="w-4 h-4 text-gray-400" />
+                  )}
                 </div>
-                <div className="flex-1">
-                  <span className="font-medium">{step.name}</span>
-                  <span className="text-gray-500 mx-2">•</span>
-                  <span className="text-gray-600">{getDelayDescription(step)}</span>
-                </div>
-                {step.messageType === 'sms' ? (
-                  <Smartphone className="w-4 h-4 text-gray-400" />
-                ) : (
-                  <Mail className="w-4 h-4 text-gray-400" />
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

@@ -71,6 +71,23 @@ export const Outreach = () => {
   const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Validate sequence steps if creating a sequence
+      if (campaignType === 'sequence') {
+        const hasIncompleteSteps = sequenceSteps.some(step => 
+          !step.name.trim() || !step.messageTemplate.trim()
+        );
+        
+        if (hasIncompleteSteps) {
+          alert('Please complete all step details before saving the campaign.');
+          return;
+        }
+        
+        if (sequenceSteps.length === 0) {
+          alert('Please add at least one step to your sequence campaign.');
+          return;
+        }
+      }
+
       const campaignData = {
         ...newCampaign,
         isSequence: campaignType === 'sequence',
@@ -339,7 +356,14 @@ export const Outreach = () => {
                     )}
                   </div>
                   <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-700 font-mono">{campaign.messageTemplate}</p>
+                    {campaign.isSequence ? (
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <Layers className="w-4 h-4" />
+                        <span>Multi-step sequence campaign</span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-700 font-mono">{campaign.messageTemplate}</p>
+                    )}
                   </div>
                   <div className="mt-3 flex justify-end">
                     <Link to={`/outreach/${campaign.id}`} className="btn btn-secondary">Edit</Link>

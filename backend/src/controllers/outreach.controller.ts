@@ -112,7 +112,18 @@ export class OutreachController {
   createCampaign = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { practiceId } = req.user!;
-      const { name, description, triggerType, messageType, messageTemplate, minBenefitAmount } = req.body;
+      const { 
+        name, 
+        description, 
+        triggerType, 
+        messageType, 
+        messageTemplate, 
+        minBenefitAmount,
+        isSequence,
+        autoStopOnAppointment,
+        autoStopOnResponse,
+        autoStopOnOptOut
+      } = req.body;
 
       const campaign = await prisma.outreachCampaign.create({
         data: {
@@ -121,9 +132,14 @@ export class OutreachController {
           description,
           triggerType,
           messageType,
-          messageTemplate,
+          messageTemplate: messageTemplate || (isSequence ? 'Sequence campaign - templates defined in steps' : ''),
           minBenefitAmount: minBenefitAmount || 200,
           isActive: true,
+          // Sequence fields with defaults
+          isSequence: isSequence || false,
+          autoStopOnAppointment: autoStopOnAppointment !== undefined ? autoStopOnAppointment : true,
+          autoStopOnResponse: autoStopOnResponse !== undefined ? autoStopOnResponse : true,
+          autoStopOnOptOut: autoStopOnOptOut !== undefined ? autoStopOnOptOut : true,
         },
       });
 

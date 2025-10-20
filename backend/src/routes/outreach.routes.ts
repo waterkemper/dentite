@@ -30,7 +30,20 @@ router.post(
     body('messageType')
       .isIn(['sms', 'email', 'both'])
       .withMessage('Invalid message type'),
-    body('messageTemplate').notEmpty().withMessage('Message template is required'),
+    // Make messageTemplate optional for sequence campaigns
+    body('messageTemplate')
+      .custom((value, { req }) => {
+        const isSequence = req.body.isSequence;
+        if (!isSequence && (!value || value.trim() === '')) {
+          throw new Error('Message template is required for single-message campaigns');
+        }
+        return true;
+      }),
+    // Optional sequence fields
+    body('isSequence').optional().isBoolean().withMessage('isSequence must be boolean'),
+    body('autoStopOnAppointment').optional().isBoolean().withMessage('autoStopOnAppointment must be boolean'),
+    body('autoStopOnResponse').optional().isBoolean().withMessage('autoStopOnResponse must be boolean'),
+    body('autoStopOnOptOut').optional().isBoolean().withMessage('autoStopOnOptOut must be boolean'),
   ],
   validateRequest,
   outreachController.createCampaign
@@ -86,7 +99,13 @@ router.post(
     body('messageType')
       .isIn(['sms', 'email'])
       .withMessage('Message type must be sms or email'),
-    body('messageTemplate').notEmpty().withMessage('Message template is required'),
+    body('messageTemplate')
+      .custom((value) => {
+        if (!value || value.trim() === '') {
+          throw new Error('Message template is required');
+        }
+        return true;
+      }),
     body('delayType')
       .isIn(['fixed_days', 'days_before_expiry'])
       .withMessage('Delay type must be fixed_days or days_before_expiry'),
