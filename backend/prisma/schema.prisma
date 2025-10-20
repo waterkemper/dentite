@@ -1,0 +1,292 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Practice {
+  id                String   @id @default(uuid())
+  name              String
+  email             String   @unique
+  phone             String?
+  address           String?
+  city              String?
+  state             String?
+  zipCode           String?
+  subscriptionTier  String   @default("basic") // basic, premium
+  subscriptionStatus String  @default("active") // active, inactive, trial
+  // Deprecated OpenDental-specific fields (kept for compatibility)
+  openDentalApiKey  String?
+  openDentalUrl     String?
+  // Multi-PMS support
+  pmsType           String?  // opendental, ortho2edge
+  pmsApiKey         String?
+  pmsUrl            String?
+  pmsConfig         Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  users             User[]
+  patients          Patient[]
+  insurancePlans    InsurancePlan[]
+  campaigns         OutreachCampaign[]
+
+  @@map("practices")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  practiceId    String
+  email         String   @unique
+  password      String
+  firstName     String
+  lastName      String
+  role          String   @default("staff") // admin, staff
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  practice      Practice @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+
+  @@map("users")
+}
+
+model Patient {
+  id                  String   @id @default(uuid())
+  practiceId          String
+  openDentalId        String?  // External ID from OpenDental
+  createdSource       String   @default("api") // api, manual
+  firstName           String
+  lastName            String
+  email               String?
+  phone               String?
+  dateOfBirth         DateTime?
+  address             String?
+  city                String?
+  state               String?
+  zipCode             String?
+  lastVisitDate       DateTime?
+  nextAppointmentDate DateTime?
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  practice            Practice @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+  insurance           PatientInsurance[]
+  benefitsSnapshots   BenefitsSnapshot[]
+  outreachLogs        OutreachLog[]
+  appointments        Appointment[]
+  preferences         PatientPreferences?
+
+  @@unique([practiceId, openDentalId])
+  @@map("patients")
+}
+
+model InsurancePlan {
+  id              String   @id @default(uuid())
+  practiceId      String
+  carrierName     String
+  planName        String?
+  groupNumber     String?
+  phone           String?
+  annualMaximum   Decimal  @default(1500.00) @db.Decimal(10, 2)
+  deductible      Decimal  @default(50.00) @db.Decimal(10, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  practice        Practice @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+  patientInsurance PatientInsurance[]
+
+  @@map("insurance_plans")
+}
+
+model PatientInsurance {
+  id                    String   @id @default(uuid())
+  patientId             String
+  insurancePlanId       String
+  policyNumber          String?
+  subscriberName        String?
+  subscriberRelation    String?  // self, spouse, child, other
+  effectiveDate         DateTime?
+  expirationDate        DateTime // Benefits expiration (typically Dec 31)
+  annualMaximum         Decimal  @db.Decimal(10, 2)
+  deductible            Decimal  @db.Decimal(10, 2)
+  deductibleMet         Decimal  @default(0.00) @db.Decimal(10, 2)
+  usedBenefits          Decimal  @default(0.00) @db.Decimal(10, 2)
+  remainingBenefits     Decimal  @db.Decimal(10, 2) // Calculated field
+  isPrimary             Boolean  @default(true)
+  isActive              Boolean  @default(true)
+  lastSyncedAt          DateTime @default(now())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  patient               Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  insurancePlan         InsurancePlan @relation(fields: [insurancePlanId], references: [id])
+
+  @@map("patient_insurance")
+}
+
+model BenefitsSnapshot {
+  id                String   @id @default(uuid())
+  patientId         String
+  snapshotDate      DateTime @default(now())
+  annualMaximum     Decimal  @db.Decimal(10, 2)
+  deductible        Decimal  @db.Decimal(10, 2)
+  deductibleMet     Decimal  @db.Decimal(10, 2)
+  usedBenefits      Decimal  @db.Decimal(10, 2)
+  remainingBenefits Decimal  @db.Decimal(10, 2)
+  daysUntilExpiry   Int
+  createdAt         DateTime @default(now())
+
+  patient           Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("benefits_snapshots")
+}
+
+model OutreachCampaign {
+  id              String   @id @default(uuid())
+  practiceId      String
+  name            String
+  description     String?
+  triggerType     String   // expiring_60, expiring_30, expiring_14
+  messageType     String   // sms, email, both
+  messageTemplate String   @db.Text
+  isActive        Boolean  @default(true)
+  minBenefitAmount Decimal @default(200.00) @db.Decimal(10, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  practice        Practice @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+  outreachLogs    OutreachLog[]
+
+  @@map("outreach_campaigns")
+}
+
+model OutreachLog {
+  id              String   @id @default(uuid())
+  campaignId      String
+  patientId       String
+  messageType     String   // sms, email
+  messageContent  String   @db.Text
+  recipientEmail  String?
+  recipientPhone  String?
+  status          String   @default("pending") // pending, sent, delivered, failed, responded
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  respondedAt     DateTime?
+  openedAt        DateTime? // Email open timestamp
+  clickedAt       DateTime? // Link click timestamp
+  bouncedAt       DateTime? // Bounce timestamp
+  unsubscribedAt  DateTime? // Unsubscribe timestamp
+  bounceType      String?   // hard, soft, spam
+  clickCount      Int      @default(0) // Number of link clicks
+  openCount       Int      @default(0) // Number of opens
+  webhookEvents   Json?    // Raw webhook event log
+  errorMessage    String?
+  externalId      String?  // Twilio/SendGrid message ID
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  campaign        OutreachCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  patient         Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  messageEvents   MessageEvent[]
+
+  @@map("outreach_logs")
+}
+
+model MessageEvent {
+  id              String   @id @default(uuid())
+  outreachLogId   String
+  eventType       String   // delivered, open, click, bounce, dropped, spamreport, unsubscribe (SendGrid) OR queued, sent, delivered, failed, undelivered (Twilio)
+  eventData       Json     // Full webhook payload
+  provider        String   // sendgrid, twilio
+  timestamp       DateTime @default(now())
+  processed       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  outreachLog     OutreachLog @relation(fields: [outreachLogId], references: [id], onDelete: Cascade)
+
+  @@index([outreachLogId])
+  @@index([eventType])
+  @@map("message_events")
+}
+
+model PatientPreferences {
+  id              String   @id @default(uuid())
+  patientId       String   @unique
+  emailOptOut     Boolean  @default(false)
+  smsOptOut       Boolean  @default(false)
+  unsubscribeReason String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  patient         Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("patient_preferences")
+}
+
+model Appointment {
+  id                String   @id @default(uuid())
+  patientId         String
+  openDentalId      String?
+  appointmentDate   DateTime
+  appointmentType   String?  // cleaning, exam, filling, crown, etc.
+  duration          Int?     // minutes
+  status            String   @default("scheduled") // scheduled, completed, cancelled, no-show
+  notes             String?  @db.Text
+  estimatedCost     Decimal? @db.Decimal(10, 2)
+  actualCost        Decimal? @db.Decimal(10, 2)
+  wasBookedFromOutreach Boolean @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  patient           Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("appointments")
+}
+
+// Orthodontic features
+model PaymentPlan {
+  id                String   @id @default(uuid())
+  patientId         String
+  totalAmount       Decimal  @db.Decimal(10, 2)
+  downPayment       Decimal  @db.Decimal(10, 2)
+  monthlyPayment    Decimal  @db.Decimal(10, 2)
+  startDate         DateTime
+  numberOfPayments  Int
+  remainingPayments Int
+  status            String
+  pmsId             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model PaymentTransaction {
+  id             String   @id @default(uuid())
+  paymentPlanId  String
+  amount         Decimal  @db.Decimal(10, 2)
+  paymentDate    DateTime
+  paymentMethod  String
+  status         String
+  pmsId          String?
+  createdAt      DateTime @default(now())
+}
+
+model TreatmentPhase {
+  id               String   @id @default(uuid())
+  patientId        String
+  phaseName        String
+  phaseNumber      Int
+  startDate        DateTime
+  expectedEndDate  DateTime
+  actualEndDate    DateTime?
+  status           String
+  estimatedCost    Decimal? @db.Decimal(10, 2)
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
