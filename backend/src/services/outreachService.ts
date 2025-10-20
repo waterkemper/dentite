@@ -285,7 +285,7 @@ export class OutreachService {
         <body>
           <div class="container">
             <div class="header">
-              <h1>🦷 Dental Benefits Alert</h1>
+              <h1>ðŸ¦· Dental Benefits Alert</h1>
             </div>
             <div class="content">
               <p>Hi ${name},</p>
@@ -369,6 +369,383 @@ export class OutreachService {
         return 14;
       default:
         return 60;
+    }
+  }
+
+  /**
+   * Process sequence campaigns
+   */
+  async processSequences(practiceId: string): Promise<{ processed: number; stopped: number; completed: number }> {
+    try {
+      // Get all active sequence states with nextScheduledAt <= now
+      const dueSequences = await prisma.patientSequenceState.findMany({
+        where: {
+          campaign: { practiceId },
+          status: 'active',
+          nextScheduledAt: { lte: new Date() },
+        },
+        include: {
+          campaign: { 
+            include: { 
+              steps: { 
+                where: { isActive: true },
+                orderBy: { stepNumber: 'asc' } 
+              } 
+            } 
+          },
+          patient: { include: { insurance: true, preferences: true } },
+        },
+      });
+
+      let processed = 0;
+      let stopped = 0;
+      let completed = 0;
+
+      for (const state of dueSequences) {
+        // Check termination conditions
+        const stopCheck = await this.shouldStopSequence(state);
+        if (stopCheck.stop) {
+          await this.stopSequence(state.id, stopCheck.reason!);
+          stopped++;
+          continue;
+        }
+
+        // Get next step
+        const nextStep = state.campaign.steps.find(
+          (s) => s.stepNumber === state.currentStepNumber + 1
+        );
+
+        if (!nextStep) {
+          // Sequence complete
+          await this.completeSequence(state.id);
+          completed++;
+          continue;
+        }
+
+        // Send message
+        await this.sendSequenceStep(state, nextStep);
+        processed++;
+
+        // Update state
+        await this.updateSequenceState(state.id, nextStep, state.patient);
+      }
+
+      return { processed, stopped, completed };
+    } catch (error) {
+      console.error('Process sequences error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if sequence should stop
+   */
+  private async shouldStopSequence(
+    state: any
+  ): Promise<{ stop: boolean; reason?: string }> {
+    const { campaign, patient } = state;
+
+    // Check appointment booked
+    if (campaign.autoStopOnAppointment) {
+      const hasAppointment = await prisma.appointment.findFirst({
+        where: {
+          patientId: patient.id,
+          appointmentDate: { gte: new Date() },
+          status: { in: ['scheduled'] },
+          createdAt: { gte: state.startedAt },
+        },
+      });
+      if (hasAppointment) return { stop: true, reason: 'appointment_booked' };
+    }
+
+    // Check patient responded
+    if (campaign.autoStopOnResponse) {
+      const hasResponse = await prisma.outreachLog.findFirst({
+        where: {
+          patientId: patient.id,
+          campaignId: campaign.id,
+          status: 'responded',
+          createdAt: { gte: state.startedAt },
+        },
+      });
+      if (hasResponse) return { stop: true, reason: 'patient_responded' };
+    }
+
+    // Check opt-out
+    if (campaign.autoStopOnOptOut) {
+      const prefs = await prisma.patientPreferences.findUnique({
+        where: { patientId: patient.id },
+      });
+      if (prefs?.emailOptOut && prefs?.smsOptOut) {
+        return { stop: true, reason: 'opted_out' };
+      }
+    }
+
+    // Check benefits expired
+    const insurance = patient.insurance.find((i: any) => i.isActive);
+    if (insurance && new Date(insurance.expirationDate) < new Date()) {
+      return { stop: true, reason: 'expiry_passed' };
+    }
+
+    return { stop: false };
+  }
+
+  /**
+   * Stop a sequence
+   */
+  private async stopSequence(stateId: string, reason: string): Promise<void> {
+    await prisma.patientSequenceState.update({
+      where: { id: stateId },
+      data: {
+        status: 'stopped',
+        stopReason: reason,
+        stoppedAt: new Date(),
+      },
+    });
+  }
+
+  /**
+   * Complete a sequence
+   */
+  private async completeSequence(stateId: string): Promise<void> {
+    await prisma.patientSequenceState.update({
+      where: { id: stateId },
+      data: {
+        status: 'completed',
+        completedAt: new Date(),
+      },
+    });
+  }
+
+  /**
+   * Send a sequence step
+   */
+  private async sendSequenceStep(state: any, step: any): Promise<void> {
+    const { patient } = state;
+    
+    // Get benefits info for message personalization
+    const benefits = await this.benefitsEngine.calculatePatientBenefits(
+      patient.id,
+      state.campaign.practiceId
+    );
+
+    if (!benefits) {
+      console.error(`No benefits found for patient ${patient.id}`);
+      return;
+    }
+
+    const message = this.personalizeMessage(step.messageTemplate, benefits);
+    let result: SendResult = { success: false };
+
+    // Check patient preferences
+    const preferences = await prisma.patientPreferences.findUnique({
+      where: { patientId: patient.id },
+    });
+
+    try {
+      if (step.messageType === 'sms' && patient.phone) {
+        if (preferences?.smsOptOut) {
+          console.log(`Patient ${patient.id} opted out of SMS, skipping step`);
+          return;
+        }
+        result = await this.sendSMS(patient.phone, message);
+        await this.logOutreachWithStep(
+          state.campaign.id,
+          patient.id,
+          step.id,
+          step.stepNumber,
+          'sms',
+          message,
+          patient.phone,
+          result
+        );
+      } else if (step.messageType === 'email' && patient.email) {
+        if (preferences?.emailOptOut) {
+          console.log(`Patient ${patient.id} opted out of email, skipping step`);
+          return;
+        }
+        result = await this.sendEmail(
+          patient.email,
+          message,
+          `${patient.firstName} ${patient.lastName}`,
+          state.campaign.id,
+          patient.id
+        );
+        await this.logOutreachWithStep(
+          state.campaign.id,
+          patient.id,
+          step.id,
+          step.stepNumber,
+          'email',
+          message,
+          patient.email,
+          result
+        );
+      }
+    } catch (error) {
+      console.error(`Error sending sequence step for patient ${patient.id}:`, error);
+    }
+  }
+
+  /**
+   * Update sequence state after sending
+   */
+  private async updateSequenceState(
+    stateId: string,
+    currentStep: any,
+    patient: any
+  ): Promise<void> {
+    const nextScheduledAt = this.calculateNextScheduledTime(currentStep, patient);
+
+    await prisma.patientSequenceState.update({
+      where: { id: stateId },
+      data: {
+        currentStepNumber: currentStep.stepNumber,
+        nextScheduledAt,
+      },
+    });
+  }
+
+  /**
+   * Calculate next scheduled time based on delay configuration
+   */
+  private calculateNextScheduledTime(currentStep: any, patient: any): Date {
+    const nextDate = new Date();
+
+    if (currentStep.delayType === 'fixed_days') {
+      nextDate.setDate(nextDate.getDate() + currentStep.delayValue);
+    } else if (currentStep.delayType === 'days_before_expiry') {
+      const insurance = patient.insurance.find((i: any) => i.isActive);
+      if (insurance) {
+        const expiryDate = new Date(insurance.expirationDate);
+        nextDate.setTime(
+          expiryDate.getTime() - currentStep.delayValue * 24 * 60 * 60 * 1000
+        );
+      }
+    }
+
+    return nextDate;
+  }
+
+  /**
+   * Enroll patient in a sequence campaign
+   */
+  async enrollPatientInSequence(campaignId: string, patientId: string): Promise<void> {
+    const campaign = await prisma.outreachCampaign.findUnique({
+      where: { id: campaignId },
+      include: { steps: { where: { isActive: true }, orderBy: { stepNumber: 'asc' } } },
+    });
+
+    if (!campaign || !campaign.isSequence || campaign.steps.length === 0) {
+      throw new Error('Invalid sequence campaign');
+    }
+
+    // Check if already enrolled
+    const existing = await prisma.patientSequenceState.findUnique({
+      where: {
+        campaignId_patientId: { campaignId, patientId },
+      },
+    });
+
+    if (existing) {
+      throw new Error('Patient already enrolled in this sequence');
+    }
+
+    // Get patient with insurance
+    const patient = await prisma.patient.findUnique({
+      where: { id: patientId },
+      include: { insurance: true },
+    });
+
+    if (!patient) {
+      throw new Error('Patient not found');
+    }
+
+    // Calculate first message time
+    const firstStep = campaign.steps[0];
+    const nextScheduledAt = this.calculateNextScheduledTime(firstStep, patient);
+
+    await prisma.patientSequenceState.create({
+      data: {
+        campaignId,
+        patientId,
+        currentStepNumber: 0,
+        status: 'active',
+        nextScheduledAt,
+      },
+    });
+  }
+
+  /**
+   * Enroll multiple patients matching criteria
+   */
+  async enrollPatientsInSequence(
+    campaignId: string,
+    practiceId: string
+  ): Promise<{ enrolled: number; skipped: number }> {
+    const campaign = await prisma.outreachCampaign.findFirst({
+      where: { id: campaignId, practiceId },
+      include: { steps: { where: { isActive: true } } },
+    });
+
+    if (!campaign || !campaign.isSequence) {
+      throw new Error('Invalid sequence campaign');
+    }
+
+    const days = this.getTriggerDays(campaign.triggerType);
+    const patients = await this.benefitsEngine.getExpiringBenefits(
+      practiceId,
+      days,
+      Number(campaign.minBenefitAmount)
+    );
+
+    let enrolled = 0;
+    let skipped = 0;
+
+    for (const patient of patients) {
+      try {
+        await this.enrollPatientInSequence(campaignId, patient.patientId);
+        enrolled++;
+      } catch (error) {
+        skipped++;
+      }
+    }
+
+    return { enrolled, skipped };
+  }
+
+  /**
+   * Log outreach with step information
+   */
+  private async logOutreachWithStep(
+    campaignId: string,
+    patientId: string,
+    stepId: string,
+    stepNumber: number,
+    messageType: string,
+    messageContent: string,
+    recipient: string,
+    result: SendResult
+  ): Promise<void> {
+    try {
+      await prisma.outreachLog.create({
+        data: {
+          campaignId,
+          patientId,
+          stepId,
+          stepNumber,
+          messageType,
+          messageContent,
+          ...(messageType === 'email' && { recipientEmail: recipient }),
+          ...(messageType === 'sms' && { recipientPhone: recipient }),
+          status: result.success ? 'sent' : 'failed',
+          sentAt: result.success ? new Date() : null,
+          externalId: result.messageId,
+          errorMessage: result.error,
+        },
+      });
+    } catch (error) {
+      console.error('Log outreach with step error:', error);
     }
   }
 }

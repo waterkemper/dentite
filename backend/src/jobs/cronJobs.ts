@@ -51,6 +51,30 @@ export const setupCronJobs = (): void => {
     }
   });
 
-  console.log('✅ Cron jobs scheduled successfully');
+  // Process sequence campaigns every 15 minutes
+  cron.schedule('*/15 * * * *', async () => {
+    console.log('Running sequence processing job...');
+    
+    try {
+      const practices = await prisma.practice.findMany({
+        where: { subscriptionStatus: 'active' },
+      });
+
+      for (const practice of practices) {
+        try {
+          const result = await outreachService.processSequences(practice.id);
+          console.log(
+            `Sequences processed for practice ${practice.name}: ${result.processed} sent, ${result.stopped} stopped, ${result.completed} completed`
+          );
+        } catch (error) {
+          console.error(`Error processing sequences for practice ${practice.id}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error('Sequence processing job error:', error);
+    }
+  });
+
+  console.log('âœ… Cron jobs scheduled successfully');
 };
 

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { Link } from 'react-router-dom';
-import { Plus, Send, MessageSquare, Mail, Smartphone, CheckCircle, Eye, MousePointer } from 'lucide-react';
+import { Plus, Send, MessageSquare, Mail, Smartphone, CheckCircle, Eye, MousePointer, Layers } from 'lucide-react';
+import { SequenceBuilder, SequenceStep } from '../components/SequenceBuilder';
 
 interface Campaign {
   id: string;
@@ -12,6 +13,10 @@ interface Campaign {
   messageTemplate: string;
   isActive: boolean;
   minBenefitAmount: number;
+  isSequence?: boolean;
+  autoStopOnAppointment?: boolean;
+  autoStopOnResponse?: boolean;
+  autoStopOnOptOut?: boolean;
   metrics?: {
     totalSent: number;
     delivered: number;
@@ -27,6 +32,8 @@ export const Outreach = () => {
   const [messagingStats, setMessagingStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [campaignType, setCampaignType] = useState<'single' | 'sequence'>('single');
+  const [sequenceSteps, setSequenceSteps] = useState<SequenceStep[]>([]);
   const [newCampaign, setNewCampaign] = useState({
     name: '',
     description: '',
@@ -34,6 +41,10 @@ export const Outreach = () => {
     messageType: 'both',
     messageTemplate: '',
     minBenefitAmount: 200,
+    isSequence: false,
+    autoStopOnAppointment: true,
+    autoStopOnResponse: true,
+    autoStopOnOptOut: true,
   });
 
   useEffect(() => {
@@ -60,8 +71,25 @@ export const Outreach = () => {
   const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/outreach/campaigns', newCampaign);
+      const campaignData = {
+        ...newCampaign,
+        isSequence: campaignType === 'sequence',
+      };
+
+      // Create campaign
+      const response = await api.post('/outreach/campaigns', campaignData);
+      const campaignId = response.data.campaign.id;
+
+      // If sequence, create steps
+      if (campaignType === 'sequence' && sequenceSteps.length > 0) {
+        for (const step of sequenceSteps) {
+          await api.post(`/outreach/campaigns/${campaignId}/steps`, step);
+        }
+      }
+
       setShowCreateModal(false);
+      setCampaignType('single');
+      setSequenceSteps([]);
       setNewCampaign({
         name: '',
         description: '',
@@ -69,6 +97,10 @@ export const Outreach = () => {
         messageType: 'both',
         messageTemplate: '',
         minBenefitAmount: 200,
+        isSequence: false,
+        autoStopOnAppointment: true,
+        autoStopOnResponse: true,
+        autoStopOnOptOut: true,
       });
       await fetchData();
     } catch (error) {
@@ -255,6 +287,12 @@ export const Outreach = () => {
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
                         <h3 className="text-lg font-semibold text-gray-900">{campaign.name}</h3>
+                        {campaign.isSequence && (
+                          <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full flex items-center gap-1">
+                            <Layers className="w-3 h-3" />
+                            Sequence
+                          </span>
+                        )}
                         {campaign.isActive ? (
                           <span className="px-2 py-1 bg-success text-white text-xs font-medium rounded-full">
                             Active
@@ -273,9 +311,9 @@ export const Outreach = () => {
                           {getMessageTypeIcon(campaign.messageType)}
                           <span>{campaign.messageType === 'both' ? 'SMS + Email' : campaign.messageType.toUpperCase()}</span>
                         </div>
-                        <span>•</span>
+                        <span>â€¢</span>
                         <span>{getTriggerLabel(campaign.triggerType)}</span>
-                        <span>•</span>
+                        <span>â€¢</span>
                         <span>Min: ${campaign.minBenefitAmount}</span>
                       </div>
                     </div>
@@ -316,11 +354,52 @@ export const Outreach = () => {
       {/* Create Campaign Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-2xl font-bold text-gray-900">Create Campaign</h2>
             </div>
-            <form onSubmit={handleCreateCampaign} className="p-6 space-y-4">
+            <form onSubmit={handleCreateCampaign} className="p-6 space-y-6">
+              {/* Campaign Type Toggle */}
+              <div>
+                <label className="label">Campaign Type</label>
+                <div className="flex gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setCampaignType('single')}
+                    className={`flex-1 p-4 border-2 rounded-lg text-left transition-all ${
+                      campaignType === 'single'
+                        ? 'border-primary bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <MessageSquare className="w-5 h-5" />
+                      <span className="font-semibold">Single Message</span>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Send one message to patients matching criteria
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCampaignType('sequence')}
+                    className={`flex-1 p-4 border-2 rounded-lg text-left transition-all ${
+                      campaignType === 'sequence'
+                        ? 'border-primary bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <Layers className="w-5 h-5" />
+                      <span className="font-semibold">Multi-Step Sequence</span>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Send a series of messages over time
+                    </p>
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="label">Campaign Name</label>
                 <input
@@ -358,51 +437,113 @@ export const Outreach = () => {
                   </select>
                 </div>
 
+                {campaignType === 'single' && (
+                  <div>
+                    <label className="label">Message Type</label>
+                    <select
+                      className="input"
+                      value={newCampaign.messageType}
+                      onChange={(e) => setNewCampaign({ ...newCampaign, messageType: e.target.value })}
+                    >
+                      <option value="both">SMS + Email</option>
+                      <option value="sms">SMS Only</option>
+                      <option value="email">Email Only</option>
+                    </select>
+                  </div>
+                )}
+
                 <div>
-                  <label className="label">Message Type</label>
-                  <select
+                  <label className="label">Minimum Benefit Amount ($)</label>
+                  <input
+                    type="number"
                     className="input"
-                    value={newCampaign.messageType}
-                    onChange={(e) => setNewCampaign({ ...newCampaign, messageType: e.target.value })}
-                  >
-                    <option value="both">SMS + Email</option>
-                    <option value="sms">SMS Only</option>
-                    <option value="email">Email Only</option>
-                  </select>
+                    value={newCampaign.minBenefitAmount}
+                    onChange={(e) =>
+                      setNewCampaign({ ...newCampaign, minBenefitAmount: Number(e.target.value) })
+                    }
+                    required
+                    min="0"
+                  />
                 </div>
               </div>
 
-              <div>
-                <label className="label">Minimum Benefit Amount ($)</label>
-                <input
-                  type="number"
-                  className="input"
-                  value={newCampaign.minBenefitAmount}
-                  onChange={(e) =>
-                    setNewCampaign({ ...newCampaign, minBenefitAmount: Number(e.target.value) })
-                  }
-                  required
-                  min="0"
-                />
-              </div>
+              {/* Single Message Template */}
+              {campaignType === 'single' && (
+                <div>
+                  <label className="label">Message Template</label>
+                  <textarea
+                    className="input"
+                    rows={4}
+                    value={newCampaign.messageTemplate}
+                    onChange={(e) =>
+                      setNewCampaign({ ...newCampaign, messageTemplate: e.target.value })
+                    }
+                    required
+                    placeholder="Hi {firstName}, you have {amount} in dental benefits expiring on {expirationDate}. Don't let them go to waste! Call us to schedule your appointment."
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Available variables: {'{firstName}'}, {'{lastName}'}, {'{fullName}'}, {'{amount}'},{' '}
+                    {'{expirationDate}'}, {'{daysRemaining}'}, {'{carrier}'}
+                  </p>
+                </div>
+              )}
 
-              <div>
-                <label className="label">Message Template</label>
-                <textarea
-                  className="input"
-                  rows={4}
-                  value={newCampaign.messageTemplate}
-                  onChange={(e) =>
-                    setNewCampaign({ ...newCampaign, messageTemplate: e.target.value })
-                  }
-                  required
-                  placeholder="Hi {firstName}, you have {amount} in dental benefits expiring on {expirationDate}. Don't let them go to waste! Call us to schedule your appointment."
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Available variables: {'{firstName}'}, {'{lastName}'}, {'{fullName}'}, {'{amount}'},{' '}
-                  {'{expirationDate}'}, {'{daysRemaining}'}, {'{carrier}'}
-                </p>
-              </div>
+              {/* Sequence Builder */}
+              {campaignType === 'sequence' && (
+                <>
+                  <SequenceBuilder steps={sequenceSteps} onChange={setSequenceSteps} />
+
+                  {/* Auto-stop Options */}
+                  <div className="border-t pt-4">
+                    <label className="label mb-3">Automatic Stop Conditions</label>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newCampaign.autoStopOnAppointment}
+                          onChange={(e) =>
+                            setNewCampaign({
+                              ...newCampaign,
+                              autoStopOnAppointment: e.target.checked,
+                            })
+                          }
+                          className="w-4 h-4 text-primary"
+                        />
+                        <span className="text-sm text-gray-700">
+                          Stop when patient books an appointment
+                        </span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newCampaign.autoStopOnResponse}
+                          onChange={(e) =>
+                            setNewCampaign({
+                              ...newCampaign,
+                              autoStopOnResponse: e.target.checked,
+                            })
+                          }
+                          className="w-4 h-4 text-primary"
+                        />
+                        <span className="text-sm text-gray-700">
+                          Stop when patient responds to any message
+                        </span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newCampaign.autoStopOnOptOut}
+                          onChange={(e) =>
+                            setNewCampaign({ ...newCampaign, autoStopOnOptOut: e.target.checked })
+                          }
+                          className="w-4 h-4 text-primary"
+                        />
+                        <span className="text-sm text-gray-700">Stop when patient opts out</span>
+                      </label>
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="flex justify-end gap-3 pt-4">
                 <button

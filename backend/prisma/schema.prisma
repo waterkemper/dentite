@@ -80,6 +80,7 @@ model Patient {
   outreachLogs        OutreachLog[]
   appointments        Appointment[]
   preferences         PatientPreferences?
+  sequenceStates      PatientSequenceState[]
 
   @@unique([practiceId, openDentalId])
   @@map("patients")
@@ -147,20 +148,27 @@ model BenefitsSnapshot {
 }
 
 model OutreachCampaign {
-  id              String   @id @default(uuid())
-  practiceId      String
-  name            String
-  description     String?
-  triggerType     String   // expiring_60, expiring_30, expiring_14
-  messageType     String   // sms, email, both
-  messageTemplate String   @db.Text
-  isActive        Boolean  @default(true)
-  minBenefitAmount Decimal @default(200.00) @db.Decimal(10, 2)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                    String   @id @default(uuid())
+  practiceId            String
+  name                  String
+  description           String?
+  triggerType           String   // expiring_60, expiring_30, expiring_14
+  messageType           String   // sms, email, both
+  messageTemplate       String   @db.Text
+  isActive              Boolean  @default(true)
+  minBenefitAmount      Decimal  @default(200.00) @db.Decimal(10, 2)
+  // Sequence support
+  isSequence            Boolean  @default(false)
+  autoStopOnAppointment Boolean  @default(true)
+  autoStopOnResponse    Boolean  @default(true)
+  autoStopOnOptOut      Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   practice        Practice @relation(fields: [practiceId], references: [id], onDelete: Cascade)
   outreachLogs    OutreachLog[]
+  steps           CampaignStep[]
+  sequenceStates  PatientSequenceState[]
 
   @@map("outreach_campaigns")
 }
@@ -169,6 +177,8 @@ model OutreachLog {
   id              String   @id @default(uuid())
   campaignId      String
   patientId       String
+  stepId          String?  // For sequence campaigns
+  stepNumber      Int?     // For sequence campaigns
   messageType     String   // sms, email
   messageContent  String   @db.Text
   recipientEmail  String?
@@ -192,6 +202,7 @@ model OutreachLog {
 
   campaign        OutreachCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   patient         Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  step            CampaignStep? @relation(fields: [stepId], references: [id], onDelete: SetNull)
   messageEvents   MessageEvent[]
 
   @@map("outreach_logs")
@@ -288,5 +299,49 @@ model TreatmentPhase {
   notes            String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+// Campaign Sequence Models
+model CampaignStep {
+  id              String   @id @default(uuid())
+  campaignId      String
+  stepNumber      Int      // Order in sequence (1, 2, 3...)
+  name            String   // "Initial Reminder", "Follow-up", "Final Urgent"
+  messageType     String   // sms, email
+  messageTemplate String   @db.Text
+  delayType       String   // fixed_days, days_before_expiry
+  delayValue      Int      // Number of days
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  campaign        OutreachCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  outreachLogs    OutreachLog[]
+  
+  @@unique([campaignId, stepNumber])
+  @@map("campaign_steps")
+}
+
+model PatientSequenceState {
+  id                  String   @id @default(uuid())
+  campaignId          String
+  patientId           String
+  currentStepNumber   Int      @default(0)
+  status              String   @default("active") // active, completed, paused, stopped
+  stopReason          String?  // appointment_booked, patient_responded, opted_out, expiry_passed
+  nextScheduledAt     DateTime?
+  startedAt           DateTime @default(now())
+  completedAt         DateTime?
+  stoppedAt           DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  campaign            OutreachCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  patient             Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  @@unique([campaignId, patientId])
+  @@index([nextScheduledAt])
+  @@index([status])
+  @@map("patient_sequence_states")
 }
 

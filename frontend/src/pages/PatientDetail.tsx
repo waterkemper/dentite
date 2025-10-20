@@ -55,6 +55,7 @@ export const PatientDetail = () => {
   const [sending, setSending] = useState(false);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<any>({});
+  const [sequences, setSequences] = useState<any[]>([]);
 
   useEffect(() => {
     fetchPatient();
@@ -84,6 +85,14 @@ export const PatientDetail = () => {
         deductible: primaryInsurance?.deductible?.toString() || '',
         expirationDate: primaryInsurance?.expirationDate ? primaryInsurance.expirationDate.substring(0,10) : '',
       });
+
+      // Fetch sequences
+      try {
+        const seqResponse = await api.get(`/outreach/patients/${id}/sequences`);
+        setSequences(seqResponse.data.sequences || []);
+      } catch (error) {
+        console.error('Error fetching sequences:', error);
+      }
     } catch (error) {
       console.error('Error fetching patient:', error);
     } finally {
@@ -414,6 +423,46 @@ export const PatientDetail = () => {
           ))}
         </div>
       </div>
+
+      {/* Sequence Enrollments */}
+      {sequences.length > 0 && (
+        <div className="card p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Active Sequences</h2>
+          <div className="space-y-3">
+            {sequences.map((seq, index) => (
+              <div key={index} className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">{seq.campaign.name}</p>
+                    <div className="flex items-center gap-3 mt-2 text-xs text-gray-600">
+                      <span>Step {seq.currentStepNumber + 1}</span>
+                      <span>•</span>
+                      <span className={`px-2 py-1 rounded-full ${
+                        seq.status === 'active' ? 'bg-green-100 text-green-800' :
+                        seq.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-200 text-gray-700'
+                      }`}>
+                        {seq.status}
+                      </span>
+                      {seq.nextScheduledAt && seq.status === 'active' && (
+                        <>
+                          <span>•</span>
+                          <span>Next: {format(new Date(seq.nextScheduledAt), 'MMM d, yyyy')}</span>
+                        </>
+                      )}
+                    </div>
+                    {seq.stopReason && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Stopped: {seq.stopReason.replace(/_/g, ' ')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Outreach History */}
       <div className="card p-6">

@@ -66,5 +66,71 @@ router.get('/logs', outreachController.getLogs);
  */
 router.post('/send/:patientId', outreachController.sendManualMessage);
 
+// Sequence Management Routes
+
+/**
+ * GET /api/outreach/campaigns/:id/steps
+ * Get all steps for a campaign
+ */
+router.get('/campaigns/:id/steps', outreachController.getSteps);
+
+/**
+ * POST /api/outreach/campaigns/:id/steps
+ * Create a new step for a campaign
+ */
+router.post(
+  '/campaigns/:id/steps',
+  [
+    body('stepNumber').isInt({ min: 1 }).withMessage('Step number must be a positive integer'),
+    body('name').notEmpty().withMessage('Step name is required'),
+    body('messageType')
+      .isIn(['sms', 'email'])
+      .withMessage('Message type must be sms or email'),
+    body('messageTemplate').notEmpty().withMessage('Message template is required'),
+    body('delayType')
+      .isIn(['fixed_days', 'days_before_expiry'])
+      .withMessage('Delay type must be fixed_days or days_before_expiry'),
+    body('delayValue').isInt({ min: 0 }).withMessage('Delay value must be a non-negative integer'),
+  ],
+  validateRequest,
+  outreachController.createStep
+);
+
+/**
+ * PUT /api/outreach/campaigns/:id/steps/:stepId
+ * Update a campaign step
+ */
+router.put('/campaigns/:id/steps/:stepId', outreachController.updateStep);
+
+/**
+ * DELETE /api/outreach/campaigns/:id/steps/:stepId
+ * Delete a campaign step
+ */
+router.delete('/campaigns/:id/steps/:stepId', outreachController.deleteStep);
+
+/**
+ * POST /api/outreach/campaigns/:id/enroll/:patientId
+ * Enroll a single patient in a sequence campaign
+ */
+router.post('/campaigns/:id/enroll/:patientId', outreachController.enrollPatient);
+
+/**
+ * POST /api/outreach/campaigns/:id/enroll
+ * Enroll multiple patients matching criteria in a sequence campaign
+ */
+router.post('/campaigns/:id/enroll', outreachController.enrollPatients);
+
+/**
+ * GET /api/outreach/campaigns/:id/sequence-states
+ * Get sequence enrollment states for a campaign
+ */
+router.get('/campaigns/:id/sequence-states', outreachController.getSequenceStates);
+
+/**
+ * GET /api/outreach/patients/:patientId/sequences
+ * Get all sequence enrollments for a patient
+ */
+router.get('/patients/:patientId/sequences', outreachController.getPatientSequences);
+
 export default router;
 
