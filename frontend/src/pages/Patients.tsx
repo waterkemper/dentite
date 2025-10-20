@@ -11,7 +11,7 @@ interface Patient {
   phone: string;
   lastVisitDate: string;
   nextAppointmentDate: string;
-  insurance: {
+  insurance?: {
     carrierName: string;
     remainingBenefits: number;
     expirationDate: string;
@@ -35,6 +35,12 @@ export const Patients = () => {
     city: '',
     state: '',
     zipCode: '',
+    // Insurance fields
+    carrierName: '',
+    policyNumber: '',
+    annualMaximum: '',
+    deductible: '',
+    expirationDate: '',
   });
   const [searchParams] = useSearchParams();
 
@@ -63,13 +69,31 @@ export const Patients = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form submitted with data:', form);
     try {
-      await api.post('/patients', form);
+      const response = await api.post('/patients', form);
+      console.log('Patient created successfully:', response.data);
       setShowCreate(false);
-      setForm({ firstName: '', lastName: '', email: '', phone: '', dateOfBirth: '', address: '', city: '', state: '', zipCode: '' });
+      setForm({ 
+        firstName: '', 
+        lastName: '', 
+        email: '', 
+        phone: '', 
+        dateOfBirth: '', 
+        address: '', 
+        city: '', 
+        state: '', 
+        zipCode: '',
+        carrierName: '',
+        policyNumber: '',
+        annualMaximum: '',
+        deductible: '',
+        expirationDate: '',
+      });
       await fetchPatients();
     } catch (error) {
       console.error('Error creating patient:', error);
+      alert('Failed to create patient. Please check the console for details.');
     }
   };
 
@@ -82,10 +106,10 @@ export const Patients = () => {
     )
     .sort((a, b) => {
       if (sortBy === 'daysUntilExpiry') {
-        return a.insurance.daysUntilExpiry - b.insurance.daysUntilExpiry;
+        return (a.insurance?.daysUntilExpiry || 999999) - (b.insurance?.daysUntilExpiry || 999999);
       }
       if (sortBy === 'remainingBenefits') {
-        return b.insurance.remainingBenefits - a.insurance.remainingBenefits;
+        return (b.insurance?.remainingBenefits || 0) - (a.insurance?.remainingBenefits || 0);
       }
       return a.lastName.localeCompare(b.lastName);
     });
@@ -150,7 +174,7 @@ export const Patients = () => {
         <p className="text-sm text-blue-800">
           Showing <span className="font-semibold">{filteredPatients.length}</span> patients with{' '}
           <span className="font-semibold">
-            ${filteredPatients.reduce((sum, p) => sum + p.insurance.remainingBenefits, 0).toLocaleString()}
+            ${filteredPatients.reduce((sum, p) => sum + (p.insurance?.remainingBenefits || 0), 0).toLocaleString()}
           </span>{' '}
           in total benefits at risk
         </p>
@@ -205,6 +229,35 @@ export const Patients = () => {
                 <div>
                   <label className="label">State</label>
                   <input className="input" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
+                </div>
+              </div>
+
+              {/* Insurance Information Section */}
+              <div className="border-t pt-4 mt-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Insurance Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Insurance Carrier</label>
+                    <input className="input" value={form.carrierName} onChange={(e) => setForm({ ...form, carrierName: e.target.value })} placeholder="e.g., Blue Cross Blue Shield" />
+                  </div>
+                  <div>
+                    <label className="label">Policy Number</label>
+                    <input className="input" value={form.policyNumber} onChange={(e) => setForm({ ...form, policyNumber: e.target.value })} placeholder="Policy number" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <label className="label">Annual Maximum</label>
+                    <input className="input" type="number" value={form.annualMaximum} onChange={(e) => setForm({ ...form, annualMaximum: e.target.value })} placeholder="1500" />
+                  </div>
+                  <div>
+                    <label className="label">Deductible</label>
+                    <input className="input" type="number" value={form.deductible} onChange={(e) => setForm({ ...form, deductible: e.target.value })} placeholder="50" />
+                  </div>
+                  <div>
+                    <label className="label">Expiration Date</label>
+                    <input className="input" type="date" value={form.expirationDate} onChange={(e) => setForm({ ...form, expirationDate: e.target.value })} />
+                  </div>
                 </div>
               </div>
               <div className="flex justify-end gap-3 pt-4">
@@ -264,22 +317,28 @@ export const Patients = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900">{patient.insurance.carrierName}</div>
+                    <div className="text-sm text-gray-900">{patient.insurance?.carrierName || 'No Insurance'}</div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-sm font-semibold text-gray-900">
-                      ${patient.insurance.remainingBenefits.toLocaleString()}
+                      ${(patient.insurance?.remainingBenefits || 0).toLocaleString()}
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getExpiryColor(
-                        patient.insurance.daysUntilExpiry
-                      )}`}
-                    >
-                      <Clock className="w-3 h-3 mr-1" />
-                      {patient.insurance.daysUntilExpiry} days
-                    </span>
+                    {patient.insurance ? (
+                      <span
+                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getExpiryColor(
+                          patient.insurance.daysUntilExpiry
+                        )}`}
+                      >
+                        <Clock className="w-3 h-3 mr-1" />
+                        {patient.insurance.daysUntilExpiry} days
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border text-gray-500 bg-gray-50 border-gray-200">
+                        N/A
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <Link

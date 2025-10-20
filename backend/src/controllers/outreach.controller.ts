@@ -202,8 +202,27 @@ export class OutreachController {
         messageType
       );
 
+      // Get the latest outreach log to include message content
+      const latestLog = await prisma.outreachLog.findFirst({
+        where: {
+          patientId,
+          campaignId,
+        },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          messageContent: true,
+          messageType: true,
+          status: true,
+          sentAt: true,
+        },
+      });
+
       res.json({
         message: 'Message sent successfully',
+        messageContent: latestLog?.messageContent,
+        messageType: latestLog?.messageType,
+        status: latestLog?.status,
+        sentAt: latestLog?.sentAt,
         ...result,
       });
     } catch (error) {

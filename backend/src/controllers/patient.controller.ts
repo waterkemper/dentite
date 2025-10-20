@@ -38,7 +38,24 @@ export class PatientController {
         .map((patient) => {
           const primaryInsurance = patient.insurance.find((ins) => ins.isPrimary);
           
-          if (!primaryInsurance) return null;
+          // If no insurance, return patient with default values
+          if (!primaryInsurance) {
+            return {
+              id: patient.id,
+              firstName: patient.firstName,
+              lastName: patient.lastName,
+              email: patient.email,
+              phone: patient.phone,
+              lastVisitDate: patient.lastVisitDate,
+              nextAppointmentDate: patient.nextAppointmentDate,
+              insurance: {
+                carrierName: 'No Insurance',
+                remainingBenefits: 0,
+                expirationDate: '',
+                daysUntilExpiry: 999999, // High number so they appear at the bottom
+              },
+            };
+          }
 
           const remainingBenefits = Number(primaryInsurance.remainingBenefits);
           const daysUntil = this.calculateDaysUntilExpiry(primaryInsurance.expirationDate);
@@ -87,9 +104,13 @@ export class PatientController {
    */
   createPatient = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
+      console.log('Create patient request received:', req.body);
+      console.log('User info:', req.user);
+      
       const { practiceId } = req.user!;
       const data = req.body;
 
+      // Create patient
       const patient = await prisma.patient.create({
         data: {
           practiceId,
@@ -107,6 +128,48 @@ export class PatientController {
         },
       });
 
+      // Create insurance plan and patient insurance if insurance data is provided
+      if (data.carrierName) {
+        // First, create or find insurance plan
+        let insurancePlan = await prisma.insurancePlan.findFirst({
+          where: {
+            practiceId,
+            carrierName: data.carrierName,
+          },
+        });
+
+        if (!insurancePlan) {
+          insurancePlan = await prisma.insurancePlan.create({
+            data: {
+              practiceId,
+              carrierName: data.carrierName,
+              annualMaximum: data.annualMaximum ? parseFloat(data.annualMaximum) : 1500.00,
+              deductible: data.deductible ? parseFloat(data.deductible) : 50.00,
+            },
+          });
+        }
+
+        // Create patient insurance record
+        await prisma.patientInsurance.create({
+          data: {
+            patientId: patient.id,
+            insurancePlanId: insurancePlan.id,
+            policyNumber: data.policyNumber || null,
+            subscriberName: `${data.firstName} ${data.lastName}`,
+            subscriberRelation: 'self',
+            expirationDate: data.expirationDate ? new Date(data.expirationDate) : new Date(new Date().getFullYear(), 11, 31), // Default to end of current year
+            annualMaximum: data.annualMaximum ? parseFloat(data.annualMaximum) : 1500.00,
+            deductible: data.deductible ? parseFloat(data.deductible) : 50.00,
+            deductibleMet: 0.00,
+            usedBenefits: 0.00,
+            remainingBenefits: data.annualMaximum ? parseFloat(data.annualMaximum) : 1500.00,
+            isPrimary: true,
+            isActive: true,
+          },
+        });
+      }
+
+      console.log('Patient created successfully:', patient);
       res.status(201).json(patient);
     } catch (error) {
       console.error('Create patient error:', error);
@@ -123,6 +186,7 @@ export class PatientController {
       const { practiceId } = req.user!;
       const data = req.body;
 
+      // Update patient basic info
       const patient = await prisma.patient.update({
         where: { id },
         data: {
@@ -138,6 +202,71 @@ export class PatientController {
           practiceId,
         },
       });
+
+      // Handle insurance updates if provided
+      if (data.carrierName) {
+        // Find or create insurance plan
+        let insurancePlan = await prisma.insurancePlan.findFirst({
+          where: {
+            practiceId,
+            carrierName: data.carrierName,
+          },
+        });
+
+        if (!insurancePlan) {
+          insurancePlan = await prisma.insurancePlan.create({
+            data: {
+              practiceId,
+              carrierName: data.carrierName,
+              annualMaximum: data.annualMaximum ? parseFloat(data.annualMaximum) : 1500.00,
+              deductible: data.deductible ? parseFloat(data.deductible) : 50.00,
+            },
+          });
+        }
+
+        // Check if patient already has primary insurance
+        const existingInsurance = await prisma.patientInsurance.findFirst({
+          where: {
+            patientId: id,
+            isPrimary: true,
+          },
+        });
+
+        if (existingInsurance) {
+          // Update existing insurance
+          await prisma.patientInsurance.update({
+            where: { id: existingInsurance.id },
+            data: {
+              insurancePlanId: insurancePlan.id,
+              policyNumber: data.policyNumber || null,
+              subscriberName: `${data.firstName} ${data.lastName}`,
+              expirationDate: data.expirationDate ? new Date(data.expirationDate) : new Date(new Date().getFullYear(), 11, 31),
+              annualMaximum: data.annualMaximum ? parseFloat(data.annualMaximum) : 1500.00,
+              deductible: data.deductible ? parseFloat(data.deductible) : 50.00,
+              remainingBenefits: data.annualMaximum ? parseFloat(data.annualMaximum) : 1500.00,
+            },
+          });
+        } else {
+          // Create new insurance record
+          await prisma.patientInsurance.create({
+            data: {
+              patientId: id,
+              insurancePlanId: insurancePlan.id,
+              policyNumber: data.policyNumber || null,
+              subscriberName: `${data.firstName} ${data.lastName}`,
+              subscriberRelation: 'self',
+              expirationDate: data.expirationDate ? new Date(data.expirationDate) : new Date(new Date().getFullYear(), 11, 31),
+              annualMaximum: data.annualMaximum ? parseFloat(data.annualMaximum) : 1500.00,
+              deductible: data.deductible ? parseFloat(data.deductible) : 50.00,
+              deductibleMet: 0.00,
+              usedBenefits: 0.00,
+              remainingBenefits: data.annualMaximum ? parseFloat(data.annualMaximum) : 1500.00,
+              isPrimary: true,
+              isActive: true,
+            },
+          });
+        }
+      }
 
       res.json(patient);
     } catch (error) {

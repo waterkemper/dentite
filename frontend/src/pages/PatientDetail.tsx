@@ -64,6 +64,9 @@ export const PatientDetail = () => {
     try {
       const response = await api.get(`/patients/${id}`);
       setPatient(response.data);
+      // Get primary insurance data
+      const primaryInsurance = response.data.insurance?.find((ins: any) => ins.isPrimary);
+      
       setForm({
         firstName: response.data.firstName || '',
         lastName: response.data.lastName || '',
@@ -74,11 +77,48 @@ export const PatientDetail = () => {
         city: response.data.city || '',
         state: response.data.state || '',
         zipCode: response.data.zipCode || '',
+        // Insurance fields
+        carrierName: primaryInsurance?.insurancePlan?.carrierName || '',
+        policyNumber: primaryInsurance?.policyNumber || '',
+        annualMaximum: primaryInsurance?.annualMaximum?.toString() || '',
+        deductible: primaryInsurance?.deductible?.toString() || '',
+        expirationDate: primaryInsurance?.expirationDate ? primaryInsurance.expirationDate.substring(0,10) : '',
       });
     } catch (error) {
       console.error('Error fetching patient:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePreviewMessage = async () => {
+    try {
+      // Get first active campaign
+      const campaignsResponse = await api.get('/outreach/campaigns');
+      const campaign = campaignsResponse.data.campaigns.find((c: any) => c.isActive);
+      
+      if (campaign) {
+        // Get patient benefits for personalization
+        const benefitsResponse = await api.get(`/patients/${id}`);
+        const patientData = benefitsResponse.data;
+        
+        // Personalize the message template
+        const personalizedMessage = campaign.messageTemplate
+          .replace(/{firstName}/g, patientData.firstName || '')
+          .replace(/{lastName}/g, patientData.lastName || '')
+          .replace(/{fullName}/g, `${patientData.firstName} ${patientData.lastName}`)
+          .replace(/{amount}/g, patientData.insurance?.[0] ? `$${Math.round(patientData.insurance[0].remainingBenefits)}` : '$0')
+          .replace(/{expirationDate}/g, patientData.insurance?.[0] ? new Date(patientData.insurance[0].expirationDate).toLocaleDateString() : 'N/A')
+          .replace(/{daysRemaining}/g, patientData.insurance?.[0] ? String(patientData.insurance[0].daysUntilExpiry) : '0')
+          .replace(/{carrier}/g, patientData.insurance?.[0]?.insurancePlan?.carrierName || 'N/A');
+        
+        alert(`Message Preview:\n\n${personalizedMessage}`);
+      } else {
+        alert('No active campaign found. Please create a campaign first.');
+      }
+    } catch (error) {
+      console.error('Error previewing message:', error);
+      alert('Failed to preview message');
     }
   };
 
@@ -90,12 +130,17 @@ export const PatientDetail = () => {
       const campaign = campaignsResponse.data.campaigns.find((c: any) => c.isActive);
       
       if (campaign) {
-        await api.post(`/outreach/send/${id}`, {
+        const response = await api.post(`/outreach/send/${id}`, {
           campaignId: campaign.id,
           messageType: campaign.messageType,
         });
-        alert('Message sent successfully!');
+        
+        // Show message content in alert
+        const messageContent = response.data.messageContent || 'Message sent successfully!';
+        alert(`Message sent successfully!\n\nMessage content:\n${messageContent}`);
         await fetchPatient();
+      } else {
+        alert('No active campaign found. Please create a campaign first.');
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -185,6 +230,13 @@ export const PatientDetail = () => {
             {editing ? 'Cancel Edit' : 'Edit'}
           </button>
           <button
+            onClick={handlePreviewMessage}
+            className="btn btn-outline flex items-center"
+          >
+            <Mail className="w-4 h-4 mr-2" />
+            Preview Message
+          </button>
+          <button
             onClick={handleSendMessage}
             disabled={sending}
             className="btn btn-primary flex items-center"
@@ -242,6 +294,36 @@ export const PatientDetail = () => {
               <input className="input" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
             </div>
           </div>
+
+          {/* Insurance Information Section */}
+          <div className="border-t pt-4 mt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Insurance Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Insurance Carrier</label>
+                <input className="input" value={form.carrierName} onChange={(e) => setForm({ ...form, carrierName: e.target.value })} placeholder="e.g., Blue Cross Blue Shield" />
+              </div>
+              <div>
+                <label className="label">Policy Number</label>
+                <input className="input" value={form.policyNumber} onChange={(e) => setForm({ ...form, policyNumber: e.target.value })} placeholder="Policy number" />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div>
+                <label className="label">Annual Maximum</label>
+                <input className="input" type="number" value={form.annualMaximum} onChange={(e) => setForm({ ...form, annualMaximum: e.target.value })} placeholder="1500" />
+              </div>
+              <div>
+                <label className="label">Deductible</label>
+                <input className="input" type="number" value={form.deductible} onChange={(e) => setForm({ ...form, deductible: e.target.value })} placeholder="50" />
+              </div>
+              <div>
+                <label className="label">Expiration Date</label>
+                <input className="input" type="date" value={form.expirationDate} onChange={(e) => setForm({ ...form, expirationDate: e.target.value })} />
+              </div>
+            </div>
+          </div>
+
           <div className="flex justify-end gap-3">
             <button type="button" className="btn btn-secondary" onClick={() => setEditing(false)}>Cancel</button>
             <button type="submit" className="btn btn-primary">Save Changes</button>
@@ -341,24 +423,44 @@ export const PatientDetail = () => {
             <p className="text-gray-500 text-center py-8">No outreach messages sent yet</p>
           ) : (
             patient.outreachLogs.map((log, index) => (
-              <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{log.campaign.name}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {log.messageType.toUpperCase()} • {format(new Date(log.sentAt), 'MMM d, yyyy h:mm a')}
-                  </p>
+              <div key={index} className="bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between p-4">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">{log.campaign.name}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {log.messageType.toUpperCase()} • {format(new Date(log.sentAt), 'MMM d, yyyy h:mm a')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        log.status === 'delivered' || log.status === 'sent'
+                          ? 'bg-green-100 text-green-800'
+                          : log.status === 'failed'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-gray-200 text-gray-700'
+                      }`}
+                    >
+                      {log.status}
+                    </span>
+                    <button
+                      onClick={() => {
+                        const content = document.getElementById(`message-content-${index}`);
+                        if (content) {
+                          content.classList.toggle('hidden');
+                        }
+                      }}
+                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    >
+                      View Message
+                    </button>
+                  </div>
                 </div>
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    log.status === 'delivered' || log.status === 'sent'
-                      ? 'bg-success text-white'
-                      : log.status === 'failed'
-                      ? 'bg-danger text-white'
-                      : 'bg-gray-200 text-gray-700'
-                  }`}
-                >
-                  {log.status}
-                </span>
+                <div id={`message-content-${index}`} className="hidden px-4 pb-4">
+                  <div className="bg-white p-3 rounded border-l-4 border-blue-200">
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{log.messageContent}</p>
+                  </div>
+                </div>
               </div>
             ))
           )}
