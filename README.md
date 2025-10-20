@@ -1,4 +1,4 @@
-# ?? Dentite - Dental Benefits Tracker
+# 🦷 Dentite - Dental Benefits Tracker
 
 **Prevent thousands in lost revenue by tracking dental insurance benefits before they expire.**
 
@@ -6,7 +6,7 @@ Dentite is a full-stack SaaS platform that helps dental practices automatically 
 
 ---
 
-## ?? Problem & Solution
+## 💡 Problem & Solution
 
 **Problem:** Dental practices lose thousands every year because patients don't use their insurance benefits before they expire (typically December 31st).
 
@@ -19,7 +19,7 @@ Dentite is a full-stack SaaS platform that helps dental practices automatically 
 
 ---
 
-## ?? Business Model
+## 💰 Business Model
 
 - **$200-$300/month** per practice
 - Optional **booking fees** for scheduled appointments
@@ -27,9 +27,9 @@ Dentite is a full-stack SaaS platform that helps dental practices automatically 
 
 ---
 
-## ?? Features
+## 🚀 Features
 
-### ? MVP Features (Implemented)
+### ✅ MVP Features (Implemented)
 
 1. **OpenDental Integration**
    - Sync patient data, insurance details, and claims
@@ -66,7 +66,7 @@ Dentite is a full-stack SaaS platform that helps dental practices automatically 
 
 ---
 
-## ??? Tech Stack
+## 🛠️ Tech Stack
 
 ### Backend
 - **Node.js** + **TypeScript** + **Express**
@@ -89,7 +89,7 @@ Dentite is a full-stack SaaS platform that helps dental practices automatically 
 
 ---
 
-## ?? Setup Instructions
+## 🔧 Setup Instructions
 
 ### Prerequisites
 
@@ -178,7 +178,7 @@ npm run dev
 
 ---
 
-## ?? Database Schema
+## 📊 Database Schema
 
 The system uses PostgreSQL with the following main tables:
 
@@ -194,7 +194,7 @@ The system uses PostgreSQL with the following main tables:
 
 ---
 
-## ?? Default Login Credentials
+## 🔑 Default Login Credentials
 
 After running the seed script, you can login with:
 
@@ -203,7 +203,7 @@ After running the seed script, you can login with:
 
 ---
 
-## ?? API Endpoints
+## 📋 API Endpoints
 
 ### Authentication
 - `POST /api/auth/register` - Register new practice
@@ -232,7 +232,7 @@ After running the seed script, you can login with:
 
 ---
 
-## ?? Configuration
+## ⚙️ Configuration
 
 ### OpenDental Integration
 
@@ -265,7 +265,7 @@ SENDGRID_FROM_NAME=Dentite Benefits Tracker
 
 ---
 
-## ?? Automated Jobs
+## 🤖 Automated Jobs
 
 The system runs two automated cron jobs:
 
@@ -281,7 +281,7 @@ The system runs two automated cron jobs:
 
 ---
 
-## ?? Testing
+## 🧪 Testing
 
 ### Backend Tests
 ```bash
@@ -297,7 +297,7 @@ npm test
 
 ---
 
-## ?? Deployment
+## 🚀 Deployment
 
 ### Production Checklist
 
@@ -330,7 +330,7 @@ npm test
 
 ---
 
-## ??? Roadmap
+## 🗺️ Roadmap
 
 ### Post-MVP Features
 
@@ -347,7 +347,7 @@ npm test
 
 ---
 
-## ?? Usage Tips
+## 💡 Usage Tips
 
 1. **Initial Setup**
    - Run the OpenDental sync to import your patient data
@@ -368,7 +368,7 @@ npm test
 
 ---
 
-## ?? Documentation
+## 📚 Documentation
 
 - **[Quick Start Guide](QUICK_START.md)** - Get up and running in 5 minutes
 - **[API Documentation](API_DOCUMENTATION.md)** - Complete API reference
@@ -379,7 +379,7 @@ npm test
 
 ---
 
-## ?? Contributing
+## 🤝 Contributing
 
 Contributions are welcome! Please follow these steps:
 
@@ -391,13 +391,13 @@ Contributions are welcome! Please follow these steps:
 
 ---
 
-## ?? License
+## 📄 License
 
 This project is proprietary software. All rights reserved.
 
 ---
 
-## ?? Support
+## 🆘 Support
 
 For questions, issues, or feature requests:
 - Email: support@dentite.com
@@ -406,7 +406,7 @@ For questions, issues, or feature requests:
 
 ---
 
-## ?? Acknowledgments
+## 🙏 Acknowledgments
 
 Built with:
 - Express.js
@@ -420,4 +420,4 @@ Built with:
 
 ---
 
-**Made with ?? for dental practices everywhere.**
+**Made with ❤️ for dental practices everywhere.**
