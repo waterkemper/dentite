@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { BenefitsEngine } from './benefitsEngine';
 import { getMessagingFactory } from './messagingServiceFactory';
+import { stripeService } from './stripe.service';
 
 interface SendResult {
   success: boolean;
@@ -23,6 +24,13 @@ export class OutreachService {
    */
   async processAutomatedOutreach(practiceId: string): Promise<{ sent: number; failed: number }> {
     try {
+      // Check usage limits before processing
+      const usageCheck = await stripeService.checkUsageLimits(practiceId);
+      if (!usageCheck.allowed) {
+        console.log(`Usage limit reached for practice ${practiceId}: ${usageCheck.reason}`);
+        return { sent: 0, failed: 0 };
+      }
+
       // Get all active campaigns
       const campaigns = await prisma.outreachCampaign.findMany({
         where: {
@@ -49,6 +57,13 @@ export class OutreachService {
           const recentContact = await this.hasRecentContact(patient.patientId, campaign.id, 7);
           
           if (recentContact) continue;
+
+          // Check usage limit before each send
+          const limitCheck = await stripeService.checkUsageLimits(practiceId);
+          if (!limitCheck.allowed) {
+            console.log(`Usage limit reached, stopping automated outreach`);
+            break;
+          }
 
           try {
             await this.sendOutreach(campaign, patient);
@@ -127,6 +142,11 @@ export class OutreachService {
         } else {
           result = await this.sendSMS(campaign.practiceId, patient.phone, message);
           await this.logOutreach(campaign.id, patient.patientId, 'sms', message, patient.phone, result);
+          
+          // Record usage for successful sends
+          if (result.success) {
+            await stripeService.recordUsage(campaign.practiceId, 'sms', 1);
+          }
         }
       }
 
@@ -144,6 +164,11 @@ export class OutreachService {
             patient.patientId
           );
           await this.logOutreach(campaign.id, patient.patientId, 'email', message, patient.email, result);
+          
+          // Record usage for successful sends
+          if (result.success) {
+            await stripeService.recordUsage(campaign.practiceId, 'email', 1);
+          }
         }
       }
 

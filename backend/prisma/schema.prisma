@@ -18,6 +18,24 @@ model Practice {
   zipCode           String?
   subscriptionTier  String   @default("basic") // basic, premium
   subscriptionStatus String  @default("active") // active, inactive, trial
+  
+  // Stripe Billing
+  stripeCustomerId        String?   @unique
+  stripeSubscriptionId    String?   @unique
+  stripePriceId           String?   // Current plan price ID
+  stripePaymentMethodId   String?
+  subscriptionPeriodStart DateTime?
+  subscriptionPeriodEnd   DateTime?
+  trialEndsAt             DateTime?
+  billingCycle            String?   @default("monthly") // monthly, yearly
+  
+  // Usage tracking
+  userSeatsIncluded       Int       @default(3)
+  userSeatsUsed           Int       @default(0)
+  messagesIncluded        Int       @default(1000)
+  messagesSentThisMonth   Int       @default(0)
+  usageBillingCycleStart  DateTime?
+  
   // Deprecated OpenDental-specific fields (kept for compatibility)
   openDentalApiKey  String?
   openDentalUrl     String?
@@ -57,6 +75,7 @@ model Practice {
   patients          Patient[]
   insurancePlans    InsurancePlan[]
   campaigns         OutreachCampaign[]
+  subscriptions     Subscription[]
 
   @@map("practices")
 }
@@ -368,5 +387,24 @@ model PatientSequenceState {
   @@index([nextScheduledAt])
   @@index([status])
   @@map("patient_sequence_states")
+}
+
+model Subscription {
+  id                   String   @id @default(uuid())
+  practiceId           String
+  stripeSubscriptionId String   @unique
+  status               String   // active, canceled, past_due, trialing
+  planName             String
+  amount               Decimal  @db.Decimal(10, 2)
+  currency             String   @default("usd")
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  
+  practice             Practice @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
 }
 

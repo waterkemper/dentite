@@ -91,6 +91,15 @@ const PracticeSettings: React.FC = () => {
       setSmsProvider(data.smsProvider || 'system');
       setTwilioPhoneNumber(data.twilioPhoneNumber || '');
       setSmsFallbackEnabled(data.smsFallbackEnabled ?? true);
+      
+      // For SMS credentials, only clear if switching to system provider
+      // For custom provider, keep existing form values (user might be editing)
+      if (data.smsProvider === 'system') {
+        setTwilioAccountSid('');
+        setTwilioAuthToken('');
+      }
+      // If custom provider and no existing form values, show placeholder behavior
+      // (credentials are encrypted in DB, so we can't display them)
 
       // Populate PMS form fields
       const pmsData = pmsResponse.data;
@@ -150,9 +159,28 @@ const PracticeSettings: React.FC = () => {
 
       await api.put(`/practices/${user?.practiceId}/sms-config`, payload);
       showMessage('success', 'SMS configuration saved successfully');
-      setTwilioAccountSid(''); // Clear credentials after saving
+      
+      // Clear credentials after successful save (security best practice)
+      setTwilioAccountSid('');
       setTwilioAuthToken('');
-      loadSettings();
+      
+      // Update the settings state to reflect the save
+      setSettings(prev => ({
+        ...prev,
+        smsProvider: 'custom_twilio',
+        twilioPhoneNumber: twilioPhoneNumber,
+        hasCustomTwilio: true,
+      }));
+      
+      // Add a small delay to ensure state updates are processed
+      setTimeout(() => {
+        console.log('Form state after save:', {
+          twilioAccountSid,
+          twilioAuthToken,
+          twilioPhoneNumber,
+          smsProvider
+        });
+      }, 100);
     } catch (error: any) {
       showMessage('error', error.response?.data?.error || 'Failed to save SMS configuration');
     } finally {
@@ -599,7 +627,10 @@ const PracticeSettings: React.FC = () => {
                 <input
                   type="text"
                   value={twilioAccountSid}
-                  onChange={(e) => setTwilioAccountSid(e.target.value)}
+                  onChange={(e) => {
+                    console.log('Twilio SID changed:', e.target.value);
+                    setTwilioAccountSid(e.target.value);
+                  }}
                   placeholder={settings?.hasCustomTwilio ? '*********************' : 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'}
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 />
@@ -615,7 +646,10 @@ const PracticeSettings: React.FC = () => {
                 <input
                   type="password"
                   value={twilioAuthToken}
-                  onChange={(e) => setTwilioAuthToken(e.target.value)}
+                  onChange={(e) => {
+                    console.log('Twilio Token changed:', e.target.value);
+                    setTwilioAuthToken(e.target.value);
+                  }}
                   placeholder={settings?.hasCustomTwilio ? '*********************' : 'Enter Auth Token'}
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 />

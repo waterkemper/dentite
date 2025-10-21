@@ -18,6 +18,11 @@ app.use(helmet());
 app.use(cors());
 app.use(compression());
 app.use(morgan('dev'));
+
+// Stripe webhook needs raw body
+app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
+
+// Regular JSON parsing for all other routes
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -34,7 +39,7 @@ app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Dentite Backend running on port ${PORT}`);
+  console.log(`ðŸš€ Dentite Backend running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   
   // Setup cron jobs for automated outreach

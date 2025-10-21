@@ -69,7 +69,7 @@ export class Ortho2EdgeAdapter implements IPMSAdapter {
         }
       }
     } catch (e) {
-      // If contract-groups aren’t accessible, skip silently for now
+      // If contract-groups arenâ€™t accessible, skip silently for now
     }
 
     return { synced, errors };

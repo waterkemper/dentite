@@ -8,6 +8,7 @@ import orthoRoutes from './ortho.routes';
 import webhooksRoutes from './webhooks.routes';
 import preferencesRoutes from './preferences.routes';
 import practiceSettingsRoutes from './practiceSettings.routes';
+import billingRoutes from './billing.routes';
 
 export const setupRoutes = (app: Express): void => {
   app.use('/api/auth', authRoutes);
@@ -19,5 +20,6 @@ export const setupRoutes = (app: Express): void => {
   app.use('/api/webhooks', webhooksRoutes);
   app.use('/api/preferences', preferencesRoutes);
   app.use('/api/practices', practiceSettingsRoutes);
+  app.use('/api/billing', billingRoutes);
 };
 

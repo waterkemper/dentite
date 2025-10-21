@@ -30,3 +30,18 @@ api.interceptors.response.use(
   }
 );
 
+// Billing API
+export const billingApi = {
+  createCheckoutSession: (priceId: string) => 
+    api.post('/billing/checkout', { priceId }),
+  
+  createPortalSession: () => 
+    api.post('/billing/portal'),
+  
+  getSubscription: () => 
+    api.get('/billing/subscription'),
+  
+  getUsage: () => 
+    api.get('/billing/usage'),
+};
+

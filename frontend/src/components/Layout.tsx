@@ -10,8 +10,8 @@ import {
   X,
   Settings,
   ChevronDown,
-  User,
-  Building2
+  Building2,
+  CreditCard
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
@@ -20,6 +20,7 @@ export const Layout = () => {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [subscription, setSubscription] = useState<any>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -34,11 +35,29 @@ export const Layout = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Load subscription status
+  useEffect(() => {
+    const loadSubscription = async () => {
+      try {
+        // For development, set default trial status
+        setSubscription({
+          subscriptionStatus: 'trial',
+          isInTrial: true,
+          trialDaysRemaining: 14,
+        });
+      } catch (error) {
+        console.error('Failed to load subscription:', error);
+      }
+    };
+    loadSubscription();
+  }, []);
+
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Patients', href: '/patients', icon: Users },
     { name: 'Outreach', href: '/outreach', icon: MessageSquare },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+    { name: 'Billing', href: '/billing', icon: CreditCard },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -225,6 +244,70 @@ export const Layout = () => {
           </div>
         )}
       </nav>
+
+      {/* Subscription Banners */}
+      {subscription?.isInTrial && (
+        <div className="bg-blue-600 text-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <CreditCard className="w-5 h-5 mr-2" />
+                <span className="font-medium">
+                  Trial: {subscription.trialDaysRemaining} days remaining
+                </span>
+              </div>
+              <Link
+                to="/billing"
+                className="text-sm underline hover:text-blue-100"
+              >
+                Subscribe Now
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {subscription?.subscriptionStatus === 'past_due' && (
+        <div className="bg-red-600 text-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <CreditCard className="w-5 h-5 mr-2" />
+                <span className="font-medium">
+                  Payment Failed: Please update your payment method
+                </span>
+              </div>
+              <Link
+                to="/billing"
+                className="text-sm underline hover:text-red-100"
+              >
+                Update Payment
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {subscription?.subscriptionStatus === 'inactive' && !subscription?.isInTrial && (
+        <div className="bg-yellow-600 text-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <CreditCard className="w-5 h-5 mr-2" />
+                <span className="font-medium">
+                  Subscription Inactive: Please subscribe to continue using Dentite
+                </span>
+              </div>
+              <Link
+                to="/billing"
+                className="text-sm underline hover:text-yellow-100"
+              >
+                View Plans
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

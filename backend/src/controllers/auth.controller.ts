@@ -43,6 +43,10 @@ export class AuthController {
 
       // Create practice and admin user in transaction
       const result = await prisma.$transaction(async (tx: any) => {
+        // Set trial to expire in 14 days
+        const trialEndsAt = new Date();
+        trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+
         const newPractice = await tx.practice.create({
           data: {
             name: practice.name,
@@ -53,6 +57,8 @@ export class AuthController {
             state: practice.state,
             zipCode: practice.zipCode,
             subscriptionStatus: 'trial',
+            trialEndsAt: trialEndsAt,
+            usageBillingCycleStart: new Date(),
           },
         });
 

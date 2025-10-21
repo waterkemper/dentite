@@ -170,32 +170,38 @@ export class MessagingServiceFactory {
         const decryptedSid = decryptIfPresent(practice.twilioAccountSid);
         const decryptedToken = decryptIfPresent(practice.twilioAuthToken);
         
-        if (decryptedSid && decryptedToken && practice.twilioPhoneNumber) {
-          const customClient = twilio(decryptedSid, decryptedToken);
-          
-          const config: TwilioConfig = {
-            accountSid: decryptedSid,
-            authToken: decryptedToken,
-            phoneNumber: practice.twilioPhoneNumber,
-            provider: 'custom',
-          };
-
-          // Cache the client
-          this.twilioCache.set(practiceId, {
-            client: customClient,
-            timestamp: Date.now(),
-            provider: 'custom',
-          });
-
-          console.log(`Using custom Twilio for practice ${practiceId}`);
-          return { client: customClient, config };
+        if (!decryptedSid || !decryptedToken) {
+          throw new Error('Failed to decrypt Twilio credentials');
         }
+        
+        if (!practice.twilioPhoneNumber) {
+          throw new Error('Twilio phone number is required');
+        }
+        
+        const customClient = twilio(decryptedSid, decryptedToken);
+        
+        const config: TwilioConfig = {
+          accountSid: decryptedSid,
+          authToken: decryptedToken,
+          phoneNumber: practice.twilioPhoneNumber,
+          provider: 'custom',
+        };
+
+        // Cache the client
+        this.twilioCache.set(practiceId, {
+          client: customClient,
+          timestamp: Date.now(),
+          provider: 'custom',
+        });
+
+        console.log(`Using custom Twilio for practice ${practiceId}`);
+        return { client: customClient, config };
       } catch (error: any) {
         console.error(`Failed to initialize custom Twilio for practice ${practiceId}:`, error.message);
         
         // If fallback is disabled, throw error
         if (!practice.smsFallbackEnabled) {
-          throw new Error('Custom Twilio configuration failed and fallback is disabled');
+          throw new Error(`Custom Twilio configuration failed: ${error.message}`);
         }
         
         console.log(`Falling back to system Twilio for practice ${practiceId}`);
@@ -204,6 +210,11 @@ export class MessagingServiceFactory {
 
     // Use system Twilio (default or fallback)
     const systemClient = this.getSystemTwilioClient();
+    
+    if (!systemClient) {
+      throw new Error('No SMS provider available. Please configure either custom Twilio credentials or system Twilio credentials.');
+    }
+    
     const config: TwilioConfig = {
       accountSid: process.env.TWILIO_ACCOUNT_SID || '',
       authToken: process.env.TWILIO_AUTH_TOKEN || '',
@@ -385,9 +396,10 @@ export class MessagingServiceFactory {
     return client;
   }
 
-  private getSystemTwilioClient(): Twilio {
+  private getSystemTwilioClient(): Twilio | null {
     if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-      throw new Error('System Twilio not configured (credentials missing)');
+      console.warn('System Twilio not configured (credentials missing)');
+      return null;
     }
     
     return twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);

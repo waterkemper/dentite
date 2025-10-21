@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { prisma } from '../lib/prisma';
 import { OutreachService } from '../services/outreachService';
 import { BenefitsEngine } from '../services/benefitsEngine';
+import { stripeService } from '../services/stripe.service';
 
 export const setupCronJobs = (): void => {
   const outreachService = new OutreachService();
@@ -75,6 +76,18 @@ export const setupCronJobs = (): void => {
     }
   });
 
-  console.log('âœ… Cron jobs scheduled successfully');
+  // Reset monthly usage counters daily at 1 AM
+  cron.schedule('0 1 * * *', async () => {
+    console.log('Running monthly usage reset job...');
+    
+    try {
+      await stripeService.resetMonthlyUsage();
+      console.log('Monthly usage reset completed');
+    } catch (error) {
+      console.error('Monthly usage reset job error:', error);
+    }
+  });
+
+  console.log('Ã¢Å"â€¦ Cron jobs scheduled successfully');
 };
 
