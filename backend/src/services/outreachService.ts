@@ -288,7 +288,7 @@ export class OutreachService {
         <body>
           <div class="container">
             <div class="header">
-              <h1>Ã°Å¸Â¦Â· Dental Benefits Alert</h1>
+              <h1>Dental Benefits Alert</h1>
             </div>
             <div class="content">
               <p>Hi ${name},</p>

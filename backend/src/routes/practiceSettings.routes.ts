@@ -6,6 +6,7 @@ import {
   updateSmsConfig,
   initiateDomainVerification,
   checkVerificationStatus,
+  markDomainAsVerified,
   getDnsInstructions,
   testEmailConfig,
   testSmsConfig,
@@ -37,6 +38,7 @@ router.delete('/:practiceId/email-config', deleteEmailConfig);
 // Domain verification
 router.post('/:practiceId/email-config/verify', initiateDomainVerification);
 router.get('/:practiceId/email-config/verify-status', checkVerificationStatus);
+router.post('/:practiceId/email-config/verify-manual', markDomainAsVerified);
 router.get('/:practiceId/dns-instructions', getDnsInstructions);
 
 // SMS configuration

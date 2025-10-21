@@ -356,6 +356,42 @@ export const checkVerificationStatus = async (req: AuthRequest, res: Response): 
 };
 
 /**
+ * Manually mark domain as verified (for pre-verified domains)
+ * POST /api/practices/:practiceId/email-config/verify-manual
+ */
+export const markDomainAsVerified = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { practiceId } = req.params;
+
+    // Verify user has access
+    if (req.user && req.user.practiceId !== practiceId && req.user.role !== 'admin') {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Update the practice to mark domain as verified
+    await prisma.practice.update({
+      where: { id: practiceId },
+      data: {
+        emailDomainVerified: true,
+        emailVerificationStatus: 'verified',
+        emailLastTestedAt: new Date(),
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Domain marked as verified successfully',
+      verified: true,
+      status: 'verified',
+    });
+  } catch (error: any) {
+    console.error('Mark domain as verified error:', error);
+    res.status(500).json({ error: 'Failed to mark domain as verified' });
+  }
+};
+
+/**
  * Get DNS instructions
  * GET /api/practices/:practiceId/dns-instructions
  */

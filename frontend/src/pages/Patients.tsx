@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { Search, Mail, Phone, Clock, Plus } from 'lucide-react';
+import { Search, Mail, Phone, Clock, Plus, X, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
 
 interface Patient {
   id: string;
@@ -24,7 +24,13 @@ export const Patients = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('daysUntilExpiry');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [showCreate, setShowCreate] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<{
+    daysUntilExpiry?: number;
+    minBenefits?: number;
+    carrierName?: string;
+  }>({});
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -42,20 +48,67 @@ export const Patients = () => {
     deductible: '',
     expirationDate: '',
   });
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchPatients();
+    loadFiltersFromUrl();
   }, [searchParams]);
+
+  const loadFiltersFromUrl = () => {
+    const filter = searchParams.get('filter');
+    const daysUntilExpiry = searchParams.get('daysUntilExpiry');
+    const minBenefits = searchParams.get('minBenefits');
+    const carrierName = searchParams.get('carrierName');
+    
+    const filters: any = {};
+    
+    // Handle generic 'filter' parameter - convert to specific parameters
+    if (filter === 'expiring') {
+      // Convert generic filter to specific URL parameters
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('filter');
+      newParams.set('daysUntilExpiry', '60');
+      newParams.set('minBenefits', '200');
+      setSearchParams(newParams, { replace: true }); // Use replace to avoid creating history entry
+      
+      filters.daysUntilExpiry = 60;
+      filters.minBenefits = 200;
+    } else {
+      // Handle specific filter parameters
+      if (daysUntilExpiry) filters.daysUntilExpiry = parseInt(daysUntilExpiry);
+      if (minBenefits) filters.minBenefits = parseInt(minBenefits);
+      if (carrierName) filters.carrierName = carrierName;
+    }
+    
+    setActiveFilters(filters);
+  };
 
   const fetchPatients = async () => {
     try {
       const filter = searchParams.get('filter');
+      const daysUntilExpiry = searchParams.get('daysUntilExpiry');
+      const minBenefits = searchParams.get('minBenefits');
+      const carrierName = searchParams.get('carrierName');
+      
       const params: any = {};
       
+      // Handle generic 'filter' parameter
       if (filter === 'expiring') {
         params.daysUntilExpiry = 60;
         params.minBenefits = 200;
+      }
+      
+      // Handle specific filter parameters
+      if (daysUntilExpiry) {
+        params.daysUntilExpiry = parseInt(daysUntilExpiry);
+      }
+      if (minBenefits) {
+        params.minBenefits = parseInt(minBenefits);
+      }
+      if (carrierName) {
+        params.carrierName = carrierName;
       }
 
       const response = await api.get('/patients', { params });
@@ -97,28 +150,138 @@ export const Patients = () => {
     }
   };
 
-  const filteredPatients = patients
-    .filter(
-      (p) =>
+  const applyFilters = (patients: Patient[]) => {
+    return patients.filter((p) => {
+      // Search filter
+      const matchesSearch = 
         p.firstName.toLowerCase().includes(search.toLowerCase()) ||
         p.lastName.toLowerCase().includes(search.toLowerCase()) ||
-        p.email.toLowerCase().includes(search.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (sortBy === 'daysUntilExpiry') {
-        return (a.insurance?.daysUntilExpiry || 999999) - (b.insurance?.daysUntilExpiry || 999999);
+        p.email.toLowerCase().includes(search.toLowerCase());
+      
+      if (!matchesSearch) return false;
+      
+      // Active filters
+      if (activeFilters.daysUntilExpiry !== undefined) {
+        const days = p.insurance?.daysUntilExpiry || 999999;
+        if (days > activeFilters.daysUntilExpiry) return false;
       }
-      if (sortBy === 'remainingBenefits') {
-        return (b.insurance?.remainingBenefits || 0) - (a.insurance?.remainingBenefits || 0);
+      
+      if (activeFilters.minBenefits !== undefined) {
+        const benefits = p.insurance?.remainingBenefits || 0;
+        if (benefits < activeFilters.minBenefits) return false;
       }
-      return a.lastName.localeCompare(b.lastName);
+      
+      if (activeFilters.carrierName) {
+        const carrier = p.insurance?.carrierName?.toLowerCase() || '';
+        if (!carrier.includes(activeFilters.carrierName.toLowerCase())) return false;
+      }
+      
+      return true;
     });
+  };
+
+  const sortPatients = (patients: Patient[]) => {
+    return [...patients].sort((a, b) => {
+      let comparison = 0;
+      
+      if (sortBy === 'daysUntilExpiry') {
+        const aDays = a.insurance?.daysUntilExpiry || 999999;
+        const bDays = b.insurance?.daysUntilExpiry || 999999;
+        comparison = aDays - bDays;
+      } else if (sortBy === 'remainingBenefits') {
+        const aBenefits = a.insurance?.remainingBenefits || 0;
+        const bBenefits = b.insurance?.remainingBenefits || 0;
+        comparison = aBenefits - bBenefits;
+      } else if (sortBy === 'name') {
+        comparison = a.lastName.localeCompare(b.lastName);
+      } else if (sortBy === 'carrier') {
+        const aCarrier = a.insurance?.carrierName || '';
+        const bCarrier = b.insurance?.carrierName || '';
+        comparison = aCarrier.localeCompare(bCarrier);
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+  };
+
+  const filteredPatients = sortPatients(applyFilters(patients));
 
   const getExpiryColor = (days: number) => {
     if (days <= 14) return 'text-danger bg-red-50 border-red-200';
     if (days <= 30) return 'text-warning bg-yellow-50 border-yellow-200';
     return 'text-gray-700 bg-gray-50 border-gray-200';
   };
+
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+  };
+
+  const getSortIcon = (column: string) => {
+    if (sortBy !== column) {
+      return <ArrowUpDown className="w-4 h-4 text-gray-400" />;
+    }
+    return sortOrder === 'asc' ? 
+      <ArrowUp className="w-4 h-4 text-gray-600" /> : 
+      <ArrowDown className="w-4 h-4 text-gray-600" />;
+  };
+
+  const applyFilter = (key: string, value: any) => {
+    const newFilters = { ...activeFilters, [key]: value };
+    setActiveFilters(newFilters);
+    
+    // Update URL parameters
+    const newParams = new URLSearchParams(searchParams);
+    
+    // Remove the generic 'filter' parameter when setting specific filters
+    if (key !== 'filter' && newParams.has('filter')) {
+      newParams.delete('filter');
+    }
+    
+    if (value !== undefined && value !== '') {
+      newParams.set(key, value.toString());
+    } else {
+      newParams.delete(key);
+    }
+    setSearchParams(newParams);
+  };
+
+  const removeFilter = (key: string) => {
+    const newFilters = { ...activeFilters };
+    delete (newFilters as any)[key as keyof typeof newFilters as keyof typeof activeFilters];
+    setActiveFilters(newFilters);
+    
+    // Update URL parameters
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete(key);
+    
+    // If no specific filters remain, also remove generic filter
+    const hasSpecificFilters = newParams.has('daysUntilExpiry') || 
+                               newParams.has('minBenefits') || 
+                               newParams.has('carrierName');
+    
+    if (!hasSpecificFilters) {
+      newParams.delete('filter');
+    }
+    
+    setSearchParams(newParams);
+  };
+
+  const resetFilters = () => {
+    setActiveFilters({});
+    setSearch('');
+    setSortBy('daysUntilExpiry');
+    setSortOrder('asc');
+    setSearchParams({});
+    // Force refetch with no filters
+    fetchPatients();
+  };
+
+  const hasActiveFilters = Object.keys(activeFilters).length > 0 || search !== '';
 
   if (loading) {
     return (
@@ -135,23 +298,88 @@ export const Patients = () => {
         <p className="text-gray-600 mt-1">Manage patients and their benefits</p>
       </div>
 
-      {/* Filters */}
+      {/* Enhanced Filters */}
       <div className="card p-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              className="input pl-10"
-              placeholder="Search patients..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+        <div className="space-y-4">
+          {/* Search and Quick Actions */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                className="input pl-10"
+                placeholder="Search patients..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
+            <div className="flex items-center gap-4">
+              {hasActiveFilters && (
+                <button
+                  onClick={resetFilters}
+                  className="btn btn-secondary flex items-center"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Reset Filters
+                </button>
+              )}
+              <button className="btn btn-primary flex items-center" onClick={() => setShowCreate(true)}>
+                <Plus className="w-4 h-4 mr-2" /> Add Patient
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700">Sort by:</label>
+          {/* Filter Controls */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Days Until Expiry
+              </label>
+              <select
+                className="input py-2"
+                value={activeFilters.daysUntilExpiry || ''}
+                onChange={(e) => applyFilter('daysUntilExpiry', e.target.value ? parseInt(e.target.value) : undefined)}
+              >
+                <option value="">All</option>
+                <option value="7">7 days or less</option>
+                <option value="14">14 days or less</option>
+                <option value="30">30 days or less</option>
+                <option value="60">60 days or less</option>
+                <option value="90">90 days or less</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Min Benefits ($)
+              </label>
+              <input
+                type="number"
+                className="input py-2"
+                placeholder="e.g., 200"
+                value={activeFilters.minBenefits || ''}
+                onChange={(e) => applyFilter('minBenefits', e.target.value ? parseInt(e.target.value) : undefined)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Insurance Carrier
+              </label>
+              <input
+                type="text"
+                className="input py-2"
+                placeholder="e.g., Blue Cross"
+                value={activeFilters.carrierName || ''}
+                onChange={(e) => applyFilter('carrierName', e.target.value || undefined)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sort by
+              </label>
               <select
                 className="input py-2"
                 value={sortBy}
@@ -160,12 +388,64 @@ export const Patients = () => {
                 <option value="daysUntilExpiry">Days Until Expiry</option>
                 <option value="remainingBenefits">Remaining Benefits</option>
                 <option value="name">Name</option>
+                <option value="carrier">Insurance Carrier</option>
               </select>
             </div>
-            <button className="btn btn-primary flex items-center" onClick={() => setShowCreate(true)}>
-              <Plus className="w-4 h-4 mr-2" /> Add Patient
-            </button>
           </div>
+
+          {/* Active Filters Display */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
+              <span className="text-sm text-gray-600 flex items-center">
+                <Filter className="w-4 h-4 mr-1" />
+                Active filters:
+              </span>
+              {activeFilters.daysUntilExpiry !== undefined && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                  ≤ {activeFilters.daysUntilExpiry} days
+                  <button
+                    onClick={() => removeFilter('daysUntilExpiry')}
+                    className="ml-1 hover:text-blue-600"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {activeFilters.minBenefits !== undefined && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                  ≥ ${activeFilters.minBenefits}
+                  <button
+                    onClick={() => removeFilter('minBenefits')}
+                    className="ml-1 hover:text-green-600"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {activeFilters.carrierName && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
+                  {activeFilters.carrierName}
+                  <button
+                    onClick={() => removeFilter('carrierName')}
+                    className="ml-1 hover:text-purple-600"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {search && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
+                  "{search}"
+                  <button
+                    onClick={() => setSearch('')}
+                    className="ml-1 hover:text-gray-600"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -275,17 +555,41 @@ export const Patients = () => {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Patient
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => handleSort('name')}
+                >
+                  <div className="flex items-center gap-2">
+                    Patient
+                    {getSortIcon('name')}
+                  </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Insurance
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => handleSort('carrier')}
+                >
+                  <div className="flex items-center gap-2">
+                    Insurance
+                    {getSortIcon('carrier')}
+                  </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Remaining Benefits
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => handleSort('remainingBenefits')}
+                >
+                  <div className="flex items-center gap-2">
+                    Remaining Benefits
+                    {getSortIcon('remainingBenefits')}
+                  </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Expires In
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => handleSort('daysUntilExpiry')}
+                >
+                  <div className="flex items-center gap-2">
+                    Expires In
+                    {getSortIcon('daysUntilExpiry')}
+                  </div>
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions

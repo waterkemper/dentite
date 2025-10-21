@@ -213,6 +213,23 @@ const PracticeSettings: React.FC = () => {
     }
   };
 
+  const markDomainAsVerified = async () => {
+    if (!confirm('Are you sure your domain is already verified in SendGrid? This will mark it as verified in Dentite.')) {
+      return;
+    }
+
+    try {
+      setVerifying(true);
+      const response = await api.post(`/practices/${user?.practiceId}/email-config/verify-manual`);
+      showMessage('success', response.data.message);
+      loadSettings();
+    } catch (error: any) {
+      showMessage('error', error.response?.data?.error || 'Failed to mark domain as verified');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   const deleteEmailConfig = async () => {
     if (!confirm('Are you sure you want to delete your custom email configuration?')) return;
 
@@ -411,7 +428,7 @@ const PracticeSettings: React.FC = () => {
                   type="password"
                   value={sendgridApiKey}
                   onChange={(e) => setSendgridApiKey(e.target.value)}
-                  placeholder={settings?.hasCustomSendGrid ? '••••••••••••••••' : 'Enter SendGrid API key'}
+                  placeholder={settings?.hasCustomSendGrid ? '*********************' : 'Enter SendGrid API key'}
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 />
                 <p className="text-xs text-gray-500 mt-1">
@@ -455,7 +472,7 @@ const PracticeSettings: React.FC = () => {
                         {settings.emailDomainVerified ? (
                           <span className="text-green-600">✓ Verified</span>
                         ) : (
-                          <span className="text-yellow-600">⚠ Not Verified</span>
+                          <span className="text-yellow-600">✗ Not Verified</span>
                         )}
                       </p>
                     </div>
@@ -473,6 +490,13 @@ const PracticeSettings: React.FC = () => {
                           className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 disabled:opacity-50"
                         >
                           {verifying ? 'Checking...' : 'Check Status'}
+                        </button>
+                        <button
+                          onClick={markDomainAsVerified}
+                          disabled={verifying}
+                          className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 disabled:opacity-50"
+                        >
+                          {verifying ? 'Processing...' : 'Mark as Verified'}
                         </button>
                       </div>
                     )}
@@ -576,7 +600,7 @@ const PracticeSettings: React.FC = () => {
                   type="text"
                   value={twilioAccountSid}
                   onChange={(e) => setTwilioAccountSid(e.target.value)}
-                  placeholder={settings?.hasCustomTwilio ? '••••••••••••••••' : 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'}
+                  placeholder={settings?.hasCustomTwilio ? '*********************' : 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'}
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 />
                 <p className="text-xs text-gray-500 mt-1">
@@ -592,7 +616,7 @@ const PracticeSettings: React.FC = () => {
                   type="password"
                   value={twilioAuthToken}
                   onChange={(e) => setTwilioAuthToken(e.target.value)}
-                  placeholder={settings?.hasCustomTwilio ? '••••••••••••••••' : 'Enter Auth Token'}
+                  placeholder={settings?.hasCustomTwilio ? '*********************' : 'Enter Auth Token'}
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 />
                 <p className="text-xs text-gray-500 mt-1">
@@ -705,7 +729,7 @@ const PracticeSettings: React.FC = () => {
                   type="password"
                   value={pmsApiKey}
                   onChange={(e) => setPmsApiKey(e.target.value)}
-                  placeholder={pmsConfig?.hasPmsConfig ? '••••••••••••••••' : 'Enter API key'}
+                  placeholder={pmsConfig?.hasPmsConfig ? '*********************' : 'Enter API key'}
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 />
                 <p className="text-xs text-gray-500 mt-1">
