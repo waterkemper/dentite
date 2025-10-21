@@ -11,6 +11,10 @@ import {
   testSmsConfig,
   deleteEmailConfig,
   deleteSmsConfig,
+  getPmsConfig,
+  updatePmsConfig,
+  testPmsConnection,
+  deletePmsConfig,
 } from '../controllers/practiceSettings.controller';
 
 const router = Router();
@@ -39,6 +43,12 @@ router.get('/:practiceId/dns-instructions', getDnsInstructions);
 router.put('/:practiceId/sms-config', updateSmsConfig);
 router.post('/:practiceId/sms-config/test', testSmsConfig);
 router.delete('/:practiceId/sms-config', deleteSmsConfig);
+
+// PMS/ERP configuration
+router.get('/:practiceId/pms-config', getPmsConfig);
+router.put('/:practiceId/pms-config', updatePmsConfig);
+router.post('/:practiceId/pms-config/test', testPmsConnection);
+router.delete('/:practiceId/pms-config', deletePmsConfig);
 
 export default router;
 

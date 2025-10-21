@@ -50,6 +50,66 @@ Dentite uses a **hybrid multi-tenant messaging model**:
 
 ## Setup Guide for Practices
 
+### PMS/ERP Integration
+
+Each practice needs to configure their Practice Management System (PMS) to sync patient data, insurance information, and appointments.
+
+#### Supported PMS Systems
+
+- **OpenDental** - Full API integration
+- **Ortho2Edge** - Orthodontic practice management
+- **Dentrix** - Via Dentrix Ascend API
+- **Eaglesoft** - Patterson Dental
+- **Other/Custom** - Any REST API-compatible system
+
+#### Step 1: Obtain PMS API Credentials
+
+**For OpenDental:**
+1. Log into OpenDental as admin
+2. Navigate to Setup > Manage > API Settings
+3. Enable REST API
+4. Generate an API key
+5. Note your server URL (e.g., `https://your-server.com/opendental`)
+
+**For Ortho2Edge:**
+1. Contact Ortho2Edge support
+2. Request API access
+3. Receive API key and endpoint URL
+
+**For Dentrix/Eaglesoft/Other:**
+1. Check if your PMS has a REST API
+2. Contact your PMS provider or IT administrator
+3. Obtain API credentials and endpoint URL
+
+#### Step 2: Configure in Dentite
+
+1. Navigate to **Settings** > **PMS/ERP Integration** tab
+2. Select your PMS type from the dropdown
+3. Enter:
+   - API Key (from your PMS)
+   - API URL (your PMS endpoint)
+4. Click **Save Configuration**
+
+#### Step 3: Test Connection
+
+1. Click **Test Connection** button
+2. Verify connection is successful
+3. If test fails:
+   - Check API key is correct
+   - Verify URL is accessible
+   - Ensure firewall allows connections
+   - Check PMS API is enabled
+
+#### Step 4: Sync Patient Data
+
+After successful configuration, Dentite will automatically sync:
+- Patient demographics
+- Insurance coverage and benefits
+- Claims and treatment history
+- Upcoming appointments
+
+**Note:** Initial sync may take several minutes depending on practice size.
+
 ### Email Configuration (SendGrid)
 
 #### Prerequisites
@@ -216,6 +276,43 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ## API Endpoints
 
+### PMS Configuration
+
+**Get PMS Config**
+```http
+GET /api/practices/:practiceId/pms-config
+Authorization: Bearer {jwt_token}
+```
+
+**Update PMS Config**
+```http
+PUT /api/practices/:practiceId/pms-config
+Content-Type: application/json
+Authorization: Bearer {jwt_token}
+
+{
+  "pmsType": "opendental",
+  "pmsApiKey": "your-pms-api-key",
+  "pmsUrl": "https://your-server.com/opendental",
+  "pmsConfig": {
+    "syncInterval": "hourly",
+    "enableWebhooks": true
+  }
+}
+```
+
+**Test PMS Connection**
+```http
+POST /api/practices/:practiceId/pms-config/test
+Authorization: Bearer {jwt_token}
+```
+
+**Delete PMS Config**
+```http
+DELETE /api/practices/:practiceId/pms-config
+Authorization: Bearer {jwt_token}
+```
+
 ### Practice Messaging Settings
 
 **Get Settings**
@@ -334,6 +431,42 @@ All sensitive credentials are encrypted using AES-256-GCM:
 - Audit logs for all configuration changes
 
 ## Troubleshooting
+
+### PMS Integration Issues
+
+**Problem: PMS connection test failed**
+
+**Solution:**
+1. Verify API credentials are correct
+2. Check PMS URL is accessible (try in browser)
+3. Ensure PMS API is enabled in settings
+4. Check firewall allows outbound connections
+5. Verify API key has sufficient permissions
+
+**Problem: Data not syncing**
+
+**Solution:**
+1. Test PMS connection first
+2. Check PMS credentials haven't expired
+3. Verify patient data exists in PMS
+4. Review sync logs for specific errors
+5. Ensure PMS API has read permissions
+
+**Problem: "Invalid API key" error**
+
+**Solution:**
+1. Regenerate API key in your PMS
+2. Update configuration in Dentite
+3. Test connection immediately
+4. Check API key format is correct
+
+**Problem: Different PMS than listed**
+
+**Solution:**
+1. Select "Other/Custom" as PMS type
+2. Enter your PMS API endpoint
+3. Ensure your PMS uses REST API
+4. Contact support if you need adapter development
 
 ### Email Issues
 

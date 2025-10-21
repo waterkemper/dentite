@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
+import axios from 'axios';
 import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { encryptIfPresent, decryptIfPresent } from '../services/credentialEncryption';
@@ -558,5 +559,324 @@ function isValidPhoneNumber(phone: string): boolean {
   // Basic E.164 format validation
   const phoneRegex = /^\+[1-9]\d{1,14}$/;
   return phoneRegex.test(phone);
+}
+
+/**
+ * Get PMS configuration
+ * GET /api/practices/:practiceId/pms-config
+ */
+export const getPmsConfig = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { practiceId } = req.params;
+
+    // Verify user has access
+    if (req.user && req.user.practiceId !== practiceId && req.user.role !== 'admin') {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    const practice = await prisma.practice.findUnique({
+      where: { id: practiceId },
+      select: {
+        id: true,
+        pmsType: true,
+        pmsUrl: true,
+        pmsConfig: true,
+        // Don't send encrypted API key
+        pmsApiKey: false,
+        openDentalApiKey: false,
+      },
+    });
+
+    if (!practice) {
+      res.status(404).json({ error: 'Practice not found' });
+      return;
+    }
+
+    // Check if credentials are configured
+    const hasPmsConfig = !!practice.pmsType;
+
+    res.json({
+      ...practice,
+      hasPmsConfig,
+    });
+  } catch (error: any) {
+    console.error('Get PMS config error:', error);
+    res.status(500).json({ error: 'Failed to retrieve PMS configuration' });
+  }
+};
+
+/**
+ * Update PMS configuration
+ * PUT /api/practices/:practiceId/pms-config
+ */
+export const updatePmsConfig = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { practiceId } = req.params;
+    const {
+      pmsType,
+      pmsApiKey,
+      pmsUrl,
+      pmsConfig,
+    } = req.body;
+
+    // Verify user has access
+    if (req.user && req.user.practiceId !== practiceId && req.user.role !== 'admin') {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Validate PMS type
+    const validPmsTypes = ['opendental', 'ortho2edge', 'dentrix', 'eaglesoft', 'other'];
+    if (pmsType && !validPmsTypes.includes(pmsType)) {
+      res.status(400).json({ 
+        error: `Invalid PMS type. Must be one of: ${validPmsTypes.join(', ')}` 
+      });
+      return;
+    }
+
+    // Validate URL format if provided
+    if (pmsUrl && !isValidUrl(pmsUrl)) {
+      res.status(400).json({ error: 'Invalid URL format' });
+      return;
+    }
+
+    // Prepare update data
+    const updateData: any = {};
+
+    if (pmsType !== undefined) {
+      updateData.pmsType = pmsType;
+    }
+
+    if (pmsApiKey) {
+      // Encrypt the API key
+      updateData.pmsApiKey = encryptIfPresent(pmsApiKey);
+      // Also update legacy field for backward compatibility
+      if (pmsType === 'opendental') {
+        updateData.openDentalApiKey = encryptIfPresent(pmsApiKey);
+      }
+    }
+
+    if (pmsUrl !== undefined) {
+      updateData.pmsUrl = pmsUrl;
+      // Also update legacy field for backward compatibility
+      if (pmsType === 'opendental') {
+        updateData.openDentalUrl = pmsUrl;
+      }
+    }
+
+    if (pmsConfig !== undefined) {
+      updateData.pmsConfig = pmsConfig;
+    }
+
+    const practice = await prisma.practice.update({
+      where: { id: practiceId },
+      data: updateData,
+      select: {
+        pmsType: true,
+        pmsUrl: true,
+        pmsConfig: true,
+      },
+    });
+
+    res.json({
+      success: true,
+      practice,
+    });
+  } catch (error: any) {
+    console.error('Update PMS config error:', error);
+    res.status(500).json({ error: 'Failed to update PMS configuration' });
+  }
+};
+
+/**
+ * Test PMS connection
+ * POST /api/practices/:practiceId/pms-config/test
+ */
+export const testPmsConnection = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { practiceId } = req.params;
+
+    // Verify user has access
+    if (req.user && req.user.practiceId !== practiceId && req.user.role !== 'admin') {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    const practice = await prisma.practice.findUnique({
+      where: { id: practiceId },
+      select: {
+        pmsType: true,
+        pmsApiKey: true,
+        pmsUrl: true,
+      },
+    });
+
+    if (!practice) {
+      res.status(404).json({ error: 'Practice not found' });
+      return;
+    }
+
+    if (!practice.pmsType || !practice.pmsApiKey || !practice.pmsUrl) {
+      res.status(400).json({ 
+        error: 'PMS configuration incomplete. Please configure PMS type, API key, and URL.' 
+      });
+      return;
+    }
+
+    // Decrypt API key
+    const apiKey = decryptIfPresent(practice.pmsApiKey);
+    if (!apiKey) {
+      res.status(400).json({ error: 'Failed to decrypt API key' });
+      return;
+    }
+
+    // Test connection based on PMS type
+    let testResult;
+    switch (practice.pmsType) {
+      case 'opendental':
+        testResult = await testOpenDentalConnection(practice.pmsUrl, apiKey);
+        break;
+      case 'ortho2edge':
+        testResult = await testOrtho2EdgeConnection(practice.pmsUrl, apiKey);
+        break;
+      default:
+        testResult = await testGenericConnection(practice.pmsUrl, apiKey);
+    }
+
+    if (testResult.success) {
+      res.json({
+        success: true,
+        message: `Successfully connected to ${practice.pmsType}`,
+        details: testResult.details,
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: testResult.error || 'Connection test failed',
+      });
+    }
+  } catch (error: any) {
+    console.error('Test PMS connection error:', error);
+    res.status(500).json({ error: 'Failed to test PMS connection' });
+  }
+};
+
+/**
+ * Delete PMS configuration
+ * DELETE /api/practices/:practiceId/pms-config
+ */
+export const deletePmsConfig = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { practiceId } = req.params;
+
+    // Verify user has access
+    if (req.user && req.user.practiceId !== practiceId && req.user.role !== 'admin') {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Clear PMS configuration
+    await prisma.practice.update({
+      where: { id: practiceId },
+      data: {
+        pmsType: null,
+        pmsApiKey: null,
+        pmsUrl: null,
+        pmsConfig: Prisma.JsonNull,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'PMS configuration deleted successfully',
+    });
+  } catch (error: any) {
+    console.error('Delete PMS config error:', error);
+    res.status(500).json({ error: 'Failed to delete PMS configuration' });
+  }
+};
+
+// Helper functions for PMS connection testing
+
+async function testOpenDentalConnection(url: string, apiKey: string): Promise<any> {
+  try {
+    const response = await axios.get(`${url}/api/patients?limit=1`, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      timeout: 10000,
+    });
+    
+    return {
+      success: true,
+      details: {
+        status: response.status,
+        message: 'OpenDental API is accessible',
+      },
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message || 'Connection failed',
+    };
+  }
+}
+
+async function testOrtho2EdgeConnection(url: string, apiKey: string): Promise<any> {
+  try {
+    const response = await axios.get(`${url}/api/v1/patients?limit=1`, {
+      headers: {
+        'X-API-Key': apiKey,
+      },
+      timeout: 10000,
+    });
+    
+    return {
+      success: true,
+      details: {
+        status: response.status,
+        message: 'Ortho2Edge API is accessible',
+      },
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message || 'Connection failed',
+    };
+  }
+}
+
+async function testGenericConnection(url: string, apiKey: string): Promise<any> {
+  try {
+    const response = await axios.get(url, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      timeout: 10000,
+    });
+    
+    return {
+      success: true,
+      details: {
+        status: response.status,
+        message: 'API is accessible',
+      },
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message || 'Connection failed',
+    };
+  }
+}
+
+function isValidUrl(urlString: string): boolean {
+  try {
+    const url = new URL(urlString);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 

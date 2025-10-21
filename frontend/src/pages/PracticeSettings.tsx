@@ -25,10 +25,19 @@ interface PracticeMessagingSettings {
   hasCustomTwilio: boolean;
 }
 
+interface PmsConfig {
+  id: string;
+  pmsType: string | null;
+  pmsUrl: string | null;
+  pmsConfig: any;
+  hasPmsConfig: boolean;
+}
+
 const PracticeSettings: React.FC = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'email' | 'sms'>('email');
+  const [activeTab, setActiveTab] = useState<'email' | 'sms' | 'pms'>('email');
   const [settings, setSettings] = useState<PracticeMessagingSettings | null>(null);
+  const [pmsConfig, setPmsConfig] = useState<PmsConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -47,6 +56,11 @@ const PracticeSettings: React.FC = () => {
   const [twilioPhoneNumber, setTwilioPhoneNumber] = useState('');
   const [smsFallbackEnabled, setSmsFallbackEnabled] = useState(true);
 
+  // PMS form state
+  const [pmsType, setPmsType] = useState('');
+  const [pmsApiKey, setPmsApiKey] = useState('');
+  const [pmsUrl, setPmsUrl] = useState('');
+
   // DNS verification state
   const [showDnsWizard, setShowDnsWizard] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -60,11 +74,15 @@ const PracticeSettings: React.FC = () => {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/practices/${user?.practiceId}/messaging-settings`);
-      const data = response.data;
+      const [messagingResponse, pmsResponse] = await Promise.all([
+        api.get(`/practices/${user?.practiceId}/messaging-settings`),
+        api.get(`/practices/${user?.practiceId}/pms-config`),
+      ]);
+      
+      const data = messagingResponse.data;
       setSettings(data);
 
-      // Populate form fields
+      // Populate messaging form fields
       setEmailProvider(data.emailProvider || 'system');
       setSendgridFromEmail(data.sendgridFromEmail || '');
       setSendgridFromName(data.sendgridFromName || '');
@@ -73,6 +91,12 @@ const PracticeSettings: React.FC = () => {
       setSmsProvider(data.smsProvider || 'system');
       setTwilioPhoneNumber(data.twilioPhoneNumber || '');
       setSmsFallbackEnabled(data.smsFallbackEnabled ?? true);
+
+      // Populate PMS form fields
+      const pmsData = pmsResponse.data;
+      setPmsConfig(pmsData);
+      setPmsType(pmsData.pmsType || '');
+      setPmsUrl(pmsData.pmsUrl || '');
     } catch (error: any) {
       showMessage('error', 'Failed to load settings');
       console.error(error);
@@ -227,6 +251,60 @@ const PracticeSettings: React.FC = () => {
     }
   };
 
+  const savePmsConfig = async () => {
+    try {
+      setSaving(true);
+      const payload: any = {
+        pmsType,
+        pmsUrl,
+      };
+
+      // Only include API key if it's been entered
+      if (pmsApiKey) {
+        payload.pmsApiKey = pmsApiKey;
+      }
+
+      await api.put(`/practices/${user?.practiceId}/pms-config`, payload);
+      showMessage('success', 'PMS configuration saved successfully');
+      setPmsApiKey(''); // Clear API key field after saving
+      loadSettings();
+    } catch (error: any) {
+      showMessage('error', error.response?.data?.error || 'Failed to save PMS configuration');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const testPmsConnection = async () => {
+    try {
+      setSaving(true);
+      const response = await api.post(`/practices/${user?.practiceId}/pms-config/test`);
+      showMessage('success', response.data.message);
+    } catch (error: any) {
+      showMessage('error', error.response?.data?.error || 'PMS connection test failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deletePmsConfig = async () => {
+    if (!confirm('Are you sure you want to delete your PMS configuration? This will stop patient data synchronization.')) return;
+
+    try {
+      setSaving(true);
+      await api.delete(`/practices/${user?.practiceId}/pms-config`);
+      showMessage('success', 'PMS configuration deleted successfully');
+      setPmsApiKey('');
+      setPmsUrl('');
+      setPmsType('');
+      loadSettings();
+    } catch (error: any) {
+      showMessage('error', 'Failed to delete PMS configuration');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 5000);
@@ -276,6 +354,16 @@ const PracticeSettings: React.FC = () => {
             }`}
           >
             SMS Configuration
+          </button>
+          <button
+            onClick={() => setActiveTab('pms')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'pms'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            PMS/ERP Integration
           </button>
         </nav>
       </div>
@@ -576,6 +664,137 @@ const PracticeSettings: React.FC = () => {
               Last tested: {new Date(settings.smsLastTestedAt).toLocaleString()}
             </p>
           )}
+        </div>
+      )}
+
+      {/* PMS/ERP Integration Tab */}
+      {activeTab === 'pms' && (
+        <div className="bg-white shadow rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">PMS/ERP Integration</h2>
+          <p className="text-sm text-gray-600 mb-6">
+            Connect your Practice Management System to sync patient data, insurance information, and appointments.
+          </p>
+
+          {/* PMS Type Selection */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Practice Management System <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={pmsType}
+              onChange={(e) => setPmsType(e.target.value)}
+              className="w-full border border-gray-300 rounded px-3 py-2"
+            >
+              <option value="">Select PMS Type</option>
+              <option value="opendental">OpenDental</option>
+              <option value="ortho2edge">Ortho2Edge</option>
+              <option value="dentrix">Dentrix</option>
+              <option value="eaglesoft">Eaglesoft</option>
+              <option value="other">Other/Custom</option>
+            </select>
+          </div>
+
+          {/* PMS Configuration */}
+          {pmsType && (
+            <div className="space-y-4 border-t pt-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  API Key {!pmsConfig?.hasPmsConfig && <span className="text-red-500">*</span>}
+                </label>
+                <input
+                  type="password"
+                  value={pmsApiKey}
+                  onChange={(e) => setPmsApiKey(e.target.value)}
+                  placeholder={pmsConfig?.hasPmsConfig ? '••••••••••••••••' : 'Enter API key'}
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {pmsConfig?.hasPmsConfig
+                    ? 'Leave blank to keep existing key'
+                    : `Get your API key from your ${pmsType} dashboard`}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  API URL <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="url"
+                  value={pmsUrl}
+                  onChange={(e) => setPmsUrl(e.target.value)}
+                  placeholder={
+                    pmsType === 'opendental'
+                      ? 'https://your-server.com/opendental'
+                      : pmsType === 'ortho2edge'
+                      ? 'https://api.ortho2edge.com'
+                      : 'https://your-pms-url.com/api'
+                  }
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {pmsType === 'opendental' && 'Your OpenDental server URL'}
+                  {pmsType === 'ortho2edge' && 'Ortho2Edge API endpoint'}
+                  {!['opendental', 'ortho2edge'].includes(pmsType) && 'Your PMS API endpoint URL'}
+                </p>
+              </div>
+
+              {/* Configuration Status */}
+              {pmsConfig?.hasPmsConfig && (
+                <div className="bg-blue-50 p-4 rounded">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-blue-900">PMS Connected</p>
+                      <p className="text-sm text-blue-700">
+                        Currently connected to: <strong>{pmsConfig.pmsType}</strong>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="mt-6 flex space-x-4">
+            <button
+              onClick={savePmsConfig}
+              disabled={saving || !pmsType}
+              className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600 disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save Configuration'}
+            </button>
+
+            {pmsConfig?.hasPmsConfig && (
+              <>
+                <button
+                  onClick={testPmsConnection}
+                  disabled={saving}
+                  className="bg-green-500 text-white px-6 py-2 rounded hover:bg-green-600 disabled:opacity-50"
+                >
+                  Test Connection
+                </button>
+                <button
+                  onClick={deletePmsConfig}
+                  disabled={saving}
+                  className="bg-red-500 text-white px-6 py-2 rounded hover:bg-red-600 disabled:opacity-50"
+                >
+                  Delete Configuration
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Help Text */}
+          <div className="mt-6 bg-gray-50 p-4 rounded">
+            <h3 className="font-medium text-gray-900 mb-2">Need Help?</h3>
+            <ul className="text-sm text-gray-600 space-y-1">
+              <li>• <strong>OpenDental:</strong> Enable REST API in your server settings and generate an API key</li>
+              <li>• <strong>Ortho2Edge:</strong> Contact support to get your API credentials</li>
+              <li>• <strong>Dentrix:</strong> Use Dentrix Ascend API or contact your IT administrator</li>
+              <li>• <strong>Other:</strong> Ensure your PMS has a REST API and obtain valid credentials</li>
+            </ul>
+          </div>
         </div>
       )}
 
