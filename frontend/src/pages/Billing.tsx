@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { billingApi } from '../lib/api';
+import { billingApi, pricingApi } from '../lib/api';
 
 interface SubscriptionData {
   subscriptionStatus: string;
@@ -33,56 +33,22 @@ interface UsageData {
   billingCycleEnd: string | null;
 }
 
-const PRICING_PLANS = [
-  {
-    id: 'basic',
-    name: 'Basic',
-    priceId: import.meta.env.VITE_STRIPE_PRICE_BASIC || 'price_basic',
-    price: 99,
-    features: [
-      '1,000 messages/month',
-      '3 user seats',
-      'Email & SMS outreach',
-      'Basic analytics',
-      'Email support',
-    ],
-  },
-  {
-    id: 'professional',
-    name: 'Professional',
-    priceId: import.meta.env.VITE_STRIPE_PRICE_PROFESSIONAL || 'price_professional',
-    price: 199,
-    features: [
-      '5,000 messages/month',
-      '10 user seats',
-      'Email & SMS outreach',
-      'Advanced analytics',
-      'Campaign sequences',
-      'Priority email support',
-    ],
-    recommended: true,
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    priceId: import.meta.env.VITE_STRIPE_PRICE_ENTERPRISE || 'price_enterprise',
-    price: 399,
-    features: [
-      '20,000 messages/month',
-      '50 user seats',
-      'Email & SMS outreach',
-      'Advanced analytics',
-      'Campaign sequences',
-      'Custom integrations',
-      'Phone & email support',
-      'Dedicated account manager',
-    ],
-  },
-];
+interface PricingPlan {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  currency: string;
+  billingInterval: string;
+  stripePriceId: string;
+  features: string[];
+  recommended?: boolean;
+}
 
 export default function Billing() {
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [usage, setUsage] = useState<UsageData | null>(null);
+  const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -93,6 +59,10 @@ export default function Billing() {
 
   const loadBillingData = async () => {
     try {
+      // Load pricing plans from database
+      const plansResponse = await pricingApi.getPricingPlans();
+      setPricingPlans(plansResponse.data);
+
       // For now, just set default values to avoid API errors during development
       setSubscription({
         subscriptionStatus: 'trial',
@@ -201,7 +171,7 @@ export default function Billing() {
               </h3>
               {subscription.subscription && (
                 <p className="text-gray-600 mt-1">
-                  ${subscription.subscription.amount}/month • 
+                  ${subscription.subscription.amount}/month â€¢ 
                   Renews {new Date(subscription.subscription.currentPeriodEnd).toLocaleDateString()}
                 </p>
               )}
@@ -291,7 +261,7 @@ export default function Billing() {
           {subscription?.isInTrial ? 'Choose Your Plan' : 'Upgrade Your Plan'}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {PRICING_PLANS.map((plan) => (
+          {pricingPlans.map((plan) => (
             <div
               key={plan.id}
               className={`bg-white rounded-lg shadow-lg p-6 ${
@@ -329,7 +299,7 @@ export default function Billing() {
                 ))}
               </ul>
               <button
-                onClick={() => handleUpgrade(plan.priceId)}
+                onClick={() => handleUpgrade(plan.stripePriceId)}
                 disabled={
                   checkoutLoading ||
                   (!subscription?.isInTrial && subscription?.subscriptionTier === plan.id)

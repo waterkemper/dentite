@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, ArrowLeft } from 'lucide-react';
 
 export const Register = () => {
   const [formData, setFormData] = useState({
@@ -29,7 +29,7 @@ export const Register = () => {
 
     try {
       await register(formData);
-      navigate('/dashboard');
+      navigate('/app/onboarding');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Registration failed. Please try again.');
     } finally {
@@ -50,6 +50,16 @@ export const Register = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 px-4 py-12">
       <div className="max-w-2xl w-full">
+        <div className="mb-4">
+          <Link 
+            to="/" 
+            className="inline-flex items-center text-primary hover:text-blue-700 font-medium"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Home
+          </Link>
+        </div>
+        
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-primary mb-2">🦷 Dentite</h1>
           <p className="text-gray-600">Start your free trial today</p>

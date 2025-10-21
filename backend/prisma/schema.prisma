@@ -36,6 +36,11 @@ model Practice {
   messagesSentThisMonth   Int       @default(0)
   usageBillingCycleStart  DateTime?
   
+  // Onboarding
+  onboardingCompleted     Boolean   @default(false)
+  onboardingStep          Int?
+  onboardingCompletedAt   DateTime?
+  
   // Deprecated OpenDental-specific fields (kept for compatibility)
   openDentalApiKey  String?
   openDentalUrl     String?
@@ -389,9 +394,44 @@ model PatientSequenceState {
   @@map("patient_sequence_states")
 }
 
+model PricingPlan {
+  id                String   @id @default(uuid())
+  name              String   @unique
+  displayName       String
+  description       String?
+  price             Decimal  @db.Decimal(10, 2)
+  currency          String   @default("usd")
+  billingInterval   String   @default("month") // month, year
+  stripePriceId     String?  @unique
+  isActive          Boolean  @default(true)
+  
+  // Plan features
+  messagesIncluded  Int
+  userSeatsIncluded Int
+  
+  // Feature flags
+  hasBasicAnalytics     Boolean @default(true)
+  hasAdvancedAnalytics  Boolean @default(false)
+  hasCampaignSequences  Boolean @default(false)
+  hasCustomIntegrations Boolean @default(false)
+  hasPhoneSupport       Boolean @default(false)
+  hasDedicatedManager   Boolean @default(false)
+  
+  // Display order
+  sortOrder         Int      @default(0)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  subscriptions     Subscription[]
+
+  @@map("pricing_plans")
+}
+
 model Subscription {
   id                   String   @id @default(uuid())
   practiceId           String
+  pricingPlanId        String?
   stripeSubscriptionId String   @unique
   status               String   // active, canceled, past_due, trialing
   planName             String
@@ -404,6 +444,7 @@ model Subscription {
   updatedAt            DateTime @updatedAt
   
   practice             Practice @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+  pricingPlan          PricingPlan? @relation(fields: [pricingPlanId], references: [id])
 
   @@map("subscriptions")
 }

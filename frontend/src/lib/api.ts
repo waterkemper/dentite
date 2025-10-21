@@ -45,3 +45,9 @@ export const billingApi = {
     api.get('/billing/usage'),
 };
 
+// Pricing API
+export const pricingApi = {
+  getPricingPlans: () => 
+    api.get('/pricing/plans'),
+};
+

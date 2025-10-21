@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
+import { HelpHint } from '../components/HelpHint';
 
 interface PracticeMessagingSettings {
   id: string;
@@ -35,7 +36,7 @@ interface PmsConfig {
 
 const PracticeSettings: React.FC = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'email' | 'sms' | 'pms'>('email');
+  const [activeTab, setActiveTab] = useState<'email' | 'sms' | 'pms'>('pms');
   const [settings, setSettings] = useState<PracticeMessagingSettings | null>(null);
   const [pmsConfig, setPmsConfig] = useState<PmsConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -381,6 +382,16 @@ const PracticeSettings: React.FC = () => {
       <div className="border-b border-gray-200 mb-6">
         <nav className="-mb-px flex space-x-8">
           <button
+            onClick={() => setActiveTab('pms')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'pms'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            PMS/ERP Integration
+          </button>
+          <button
             onClick={() => setActiveTab('email')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'email'
@@ -400,23 +411,20 @@ const PracticeSettings: React.FC = () => {
           >
             SMS Configuration
           </button>
-          <button
-            onClick={() => setActiveTab('pms')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'pms'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            PMS/ERP Integration
-          </button>
         </nav>
       </div>
 
       {/* Email Configuration Tab */}
       {activeTab === 'email' && (
         <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Email Configuration</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Email Configuration</h2>
+            <HelpHint
+              title="Email Configuration"
+              content="Configure your email delivery settings. Use the system default for quick setup, or connect your own SendGrid account for better deliverability and custom branding."
+              learnMoreUrl="/help/email-configuration"
+            />
+          </div>
 
           {/* Provider Selection */}
           <div className="mb-6">
@@ -498,9 +506,9 @@ const PracticeSettings: React.FC = () => {
                       <p className="font-medium">Domain Verification Status</p>
                       <p className="text-sm text-gray-600">
                         {settings.emailDomainVerified ? (
-                          <span className="text-green-600">✓ Verified</span>
+                          <span className="text-green-600">âœ“ Verified</span>
                         ) : (
-                          <span className="text-yellow-600">✗ Not Verified</span>
+                          <span className="text-yellow-600">âœ— Not Verified</span>
                         )}
                       </p>
                     </div>
@@ -588,7 +596,14 @@ const PracticeSettings: React.FC = () => {
       {/* SMS Configuration Tab */}
       {activeTab === 'sms' && (
         <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">SMS Configuration</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">SMS Configuration</h2>
+            <HelpHint
+              title="SMS Configuration"
+              content="Set up SMS messaging to send text reminders to patients. Connect your Twilio account to enable SMS campaigns and automated patient communications."
+              learnMoreUrl="/help/sms-configuration"
+            />
+          </div>
 
           {/* Provider Selection */}
           <div className="mb-6">
@@ -847,10 +862,10 @@ const PracticeSettings: React.FC = () => {
           <div className="mt-6 bg-gray-50 p-4 rounded">
             <h3 className="font-medium text-gray-900 mb-2">Need Help?</h3>
             <ul className="text-sm text-gray-600 space-y-1">
-              <li>• <strong>OpenDental:</strong> Enable REST API in your server settings and generate an API key</li>
-              <li>• <strong>Ortho2Edge:</strong> Contact support to get your API credentials</li>
-              <li>• <strong>Dentrix:</strong> Use Dentrix Ascend API or contact your IT administrator</li>
-              <li>• <strong>Other:</strong> Ensure your PMS has a REST API and obtain valid credentials</li>
+              <li>â€¢ <strong>OpenDental:</strong> Enable REST API in your server settings and generate an API key</li>
+              <li>â€¢ <strong>Ortho2Edge:</strong> Contact support to get your API credentials</li>
+              <li>â€¢ <strong>Dentrix:</strong> Use Dentrix Ascend API or contact your IT administrator</li>
+              <li>â€¢ <strong>Other:</strong> Ensure your PMS has a REST API and obtain valid credentials</li>
             </ul>
           </div>
         </div>

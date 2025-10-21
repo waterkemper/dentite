@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Seeding database...');
+  console.log('ðŸŒ± Seeding database...');
 
   // Create practice
   const practice = await prisma.practice.upsert({
@@ -22,7 +22,7 @@ async function main() {
     },
   });
 
-  console.log('✅ Created practice:', practice.name);
+  console.log('âœ… Created practice:', practice.name);
 
   // Create admin user
   const hashedPassword = await bcrypt.hash('password123', 10);
@@ -39,7 +39,7 @@ async function main() {
     },
   });
 
-  console.log('✅ Created user:', user.email);
+  console.log('âœ… Created user:', user.email);
 
   // Create insurance plans
   const deltaInsurance = await prisma.insurancePlan.create({
@@ -62,7 +62,7 @@ async function main() {
     },
   });
 
-  console.log('✅ Created insurance plans');
+  console.log('âœ… Created insurance plans');
 
   // Create sample patients
   const patients = [
@@ -147,7 +147,7 @@ async function main() {
       },
     });
 
-    console.log(`✅ Created patient: ${patient.firstName} ${patient.lastName}`);
+    console.log(`âœ… Created patient: ${patient.firstName} ${patient.lastName}`);
   }
 
   // Create sample outreach campaign
@@ -164,14 +164,72 @@ async function main() {
     },
   });
 
-  console.log('✅ Created outreach campaign:', campaign.name);
+  console.log('âœ… Created outreach campaign:', campaign.name);
 
-  console.log('🎉 Database seeded successfully!');
+  // Create pricing plans
+  const pricingPlans = [
+    {
+      name: 'basic',
+      displayName: 'Basic',
+      description: 'Perfect for small dental practices',
+      price: new Prisma.Decimal(99.00),
+      messagesIncluded: 1000,
+      userSeatsIncluded: 3,
+      hasBasicAnalytics: true,
+      hasAdvancedAnalytics: false,
+      hasCampaignSequences: false,
+      hasCustomIntegrations: false,
+      hasPhoneSupport: false,
+      hasDedicatedManager: false,
+      sortOrder: 1,
+    },
+    {
+      name: 'professional',
+      displayName: 'Professional',
+      description: 'Ideal for growing practices',
+      price: new Prisma.Decimal(199.00),
+      messagesIncluded: 5000,
+      userSeatsIncluded: 10,
+      hasBasicAnalytics: true,
+      hasAdvancedAnalytics: true,
+      hasCampaignSequences: true,
+      hasCustomIntegrations: false,
+      hasPhoneSupport: false,
+      hasDedicatedManager: false,
+      sortOrder: 2,
+    },
+    {
+      name: 'enterprise',
+      displayName: 'Enterprise',
+      description: 'For large practices with complex needs',
+      price: new Prisma.Decimal(399.00),
+      messagesIncluded: 20000,
+      userSeatsIncluded: 50,
+      hasBasicAnalytics: true,
+      hasAdvancedAnalytics: true,
+      hasCampaignSequences: true,
+      hasCustomIntegrations: true,
+      hasPhoneSupport: true,
+      hasDedicatedManager: true,
+      sortOrder: 3,
+    },
+  ];
+
+  for (const planData of pricingPlans) {
+    const plan = await prisma.pricingPlan.upsert({
+      where: { name: planData.name },
+      update: {},
+      create: planData,
+    });
+    console.log(`âœ… Created pricing plan: ${plan.displayName}`);
+  }
+
+  console.log('ðŸŽ‰ Database seeded successfully!');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Error seeding database:', e);
+    console.error('â�Œ Error seeding database:', e);
     process.exit(1);
   })
   .finally(async () => {

@@ -11,7 +11,8 @@ import {
   Settings,
   ChevronDown,
   Building2,
-  CreditCard
+  CreditCard,
+  HelpCircle
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
@@ -53,11 +54,11 @@ export const Layout = () => {
   }, []);
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Patients', href: '/patients', icon: Users },
-    { name: 'Outreach', href: '/outreach', icon: MessageSquare },
-    { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-    { name: 'Billing', href: '/billing', icon: CreditCard },
+    { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
+    { name: 'Patients', href: '/app/patients', icon: Users },
+    { name: 'Outreach', href: '/app/outreach', icon: MessageSquare },
+    { name: 'Analytics', href: '/app/analytics', icon: BarChart3 },
+    { name: 'Billing', href: '/app/billing', icon: CreditCard },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -96,6 +97,17 @@ export const Layout = () => {
             </div>
 
             <div className="flex items-center">
+              {/* Help Center Link */}
+              <div className="hidden md:flex md:items-center md:mr-4">
+                <Link
+                  to="/app/help"
+                  className="flex items-center text-gray-700 hover:text-primary font-medium"
+                >
+                  <HelpCircle className="w-4 h-4 mr-1" />
+                  Help
+                </Link>
+              </div>
+
               {/* Desktop User Menu */}
               <div className="hidden md:flex md:items-center md:space-x-4">
                 <div className="relative" ref={dropdownRef}>
@@ -130,7 +142,7 @@ export const Layout = () => {
 
                         {/* Settings Links */}
                         <Link
-                          to="/settings"
+                          to="/app/settings"
                           onClick={() => setUserMenuOpen(false)}
                           className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                         >
@@ -218,10 +230,10 @@ export const Layout = () => {
 
               {/* Settings Link */}
               <Link
-                to="/settings"
+                to="/app/settings"
                 onClick={() => setMobileMenuOpen(false)}
                 className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
-                  isActive('/settings')
+                  isActive('/app/settings')
                     ? 'bg-primary text-white'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
@@ -257,7 +269,7 @@ export const Layout = () => {
                 </span>
               </div>
               <Link
-                to="/billing"
+                to="/app/billing"
                 className="text-sm underline hover:text-blue-100"
               >
                 Subscribe Now
@@ -278,7 +290,7 @@ export const Layout = () => {
                 </span>
               </div>
               <Link
-                to="/billing"
+                to="/app/billing"
                 className="text-sm underline hover:text-red-100"
               >
                 Update Payment
@@ -299,7 +311,7 @@ export const Layout = () => {
                 </span>
               </div>
               <Link
-                to="/billing"
+                to="/app/billing"
                 className="text-sm underline hover:text-yellow-100"
               >
                 View Plans

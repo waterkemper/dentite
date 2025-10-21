@@ -9,6 +9,8 @@ import webhooksRoutes from './webhooks.routes';
 import preferencesRoutes from './preferences.routes';
 import practiceSettingsRoutes from './practiceSettings.routes';
 import billingRoutes from './billing.routes';
+import onboardingRoutes from './onboarding.routes';
+import pricingRoutes from './pricing.routes';
 
 export const setupRoutes = (app: Express): void => {
   app.use('/api/auth', authRoutes);
@@ -21,5 +23,7 @@ export const setupRoutes = (app: Express): void => {
   app.use('/api/preferences', preferencesRoutes);
   app.use('/api/practices', practiceSettingsRoutes);
   app.use('/api/billing', billingRoutes);
+  app.use('/api/onboarding', onboardingRoutes);
+  app.use('/api/pricing', pricingRoutes);
 };
 

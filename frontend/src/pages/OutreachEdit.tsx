@@ -105,7 +105,7 @@ export const OutreachEdit = () => {
         }
       }
       
-      navigate('/outreach');
+      navigate('/app/outreach');
     } finally {
       setSaving(false);
     }
@@ -117,7 +117,7 @@ export const OutreachEdit = () => {
     setDeleting(true);
     try {
       await api.delete(`/outreach/campaigns/${id}`);
-      navigate('/outreach');
+      navigate('/app/outreach');
     } finally {
       setDeleting(false);
     }
@@ -255,7 +255,7 @@ export const OutreachEdit = () => {
         )}
 
         <div className="flex justify-end gap-3">
-          <button type="button" className="btn btn-secondary" onClick={() => navigate('/outreach')}>Cancel</button>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate('/app/outreach')}>Cancel</button>
           <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</button>
         </div>
       </form>

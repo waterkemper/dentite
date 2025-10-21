@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
+import { HelpHint } from '../components/HelpHint';
+import { PageGuide } from '../components/PageGuide';
 import { 
   Users, 
   DollarSign, 
@@ -19,13 +22,16 @@ interface DashboardMetrics {
 }
 
 export const Dashboard = () => {
+  const { user } = useAuth();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
-    fetchMetrics();
-  }, []);
+    if (user) {
+      fetchMetrics();
+    }
+  }, [user]);
 
   const fetchMetrics = async () => {
     try {
@@ -41,16 +47,21 @@ export const Dashboard = () => {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      await api.post('/patients/sync');
+      const response = await api.post('/patients/sync');
+      console.log('Sync response:', response.data);
       await fetchMetrics();
-    } catch (error) {
+      // Show success message
+      alert('Patient data synced successfully!');
+    } catch (error: any) {
       console.error('Error syncing:', error);
+      // Show error message
+      alert(`Sync failed: ${error.response?.data?.error || error.message || 'Unknown error'}`);
     } finally {
       setSyncing(false);
     }
   };
 
-  if (loading) {
+  if (!user || loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -58,21 +69,64 @@ export const Dashboard = () => {
     );
   }
 
+  const guideItems = [
+    {
+      id: 'configure-pms',
+      title: 'Configure your PMS',
+      description: 'Connect your practice management system to start importing patient data.',
+      action: {
+        text: 'Setup PMS',
+        onClick: () => window.location.href = '/app/settings'
+      }
+    },
+    {
+      id: 'setup-messaging',
+      title: 'Configure messaging services',
+      description: 'Set up email and SMS to communicate with your patients.',
+      action: {
+        text: 'Setup Messaging',
+        onClick: () => window.location.href = '/app/settings'
+      }
+    },
+    {
+      id: 'sync-data',
+      title: 'Sync your patient data',
+      description: 'Import your patients and start tracking their benefits.',
+      action: {
+        text: 'Sync Now',
+        onClick: handleSync
+      }
+    }
+  ];
+
   return (
     <div className="space-y-6">
+      <PageGuide 
+        title="Getting Started with Dentite"
+        items={guideItems}
+        showProgress={true}
+      />
+
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600 mt-1">Welcome back! Here's your practice overview.</p>
         </div>
-        <button
-          onClick={handleSync}
-          disabled={syncing}
-          className="btn btn-primary flex items-center"
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-          {syncing ? 'Syncing...' : 'Sync PMS'}
-        </button>
+        <div className="flex items-center">
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="btn btn-primary flex items-center"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync PMS'}
+          </button>
+          <HelpHint
+            title="Sync PMS"
+            content="This button syncs your patient data from your practice management system. Run this weekly or after major billing cycles to keep data current."
+            learnMoreUrl="/help/sync-pms"
+          />
+        </div>
       </div>
 
       {/* Metrics Cards */}
@@ -104,7 +158,14 @@ export const Dashboard = () => {
         <div className="card p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Value at Risk</p>
+              <div className="flex items-center">
+                <p className="text-sm font-medium text-gray-600">Value at Risk</p>
+                <HelpHint
+                  title="Value at Risk"
+                  content="This is the total dollar amount of insurance benefits that will expire soon if patients don't use them. This represents potential lost revenue for your practice."
+                  learnMoreUrl="/help/value-at-risk"
+                />
+              </div>
               <p className="text-3xl font-bold text-danger mt-2">
                 ${(metrics?.totalValueAtRisk || 0).toLocaleString()}
               </p>
@@ -132,7 +193,7 @@ export const Dashboard = () => {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
           <div className="space-y-3">
             <Link
-              to="/patients?filter=expiring"
+              to="/app/patients?filter=expiring"
               className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
             >
               <div className="flex items-center">
@@ -145,7 +206,7 @@ export const Dashboard = () => {
             </Link>
             
             <Link
-              to="/outreach"
+              to="/app/outreach"
               className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
             >
               <div className="flex items-center">
@@ -155,7 +216,7 @@ export const Dashboard = () => {
             </Link>
             
             <Link
-              to="/analytics"
+              to="/app/analytics"
               className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
             >
               <div className="flex items-center">
