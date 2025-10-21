@@ -10,6 +10,7 @@ import { PatientDetail } from './pages/PatientDetail';
 import { Outreach } from './pages/Outreach';
 import { Analytics } from './pages/Analytics';
 import { OutreachEdit } from './pages/OutreachEdit';
+import PracticeSettings from './pages/PracticeSettings';
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
             <Route path="outreach" element={<Outreach />} />
             <Route path="outreach/:id" element={<OutreachEdit />} />
             <Route path="analytics" element={<Analytics />} />
+            <Route path="settings" element={<PracticeSettings />} />
           </Route>
         </Routes>
       </Router>

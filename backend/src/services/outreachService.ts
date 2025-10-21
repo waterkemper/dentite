@@ -1,33 +1,21 @@
-import twilio from 'twilio';
-import sgMail from '@sendgrid/mail';
 import { prisma } from '../lib/prisma';
 import { BenefitsEngine } from './benefitsEngine';
+import { getMessagingFactory } from './messagingServiceFactory';
 
 interface SendResult {
   success: boolean;
   messageId?: string;
   error?: string;
+  provider?: 'system' | 'custom' | 'custom_sendgrid' | 'custom_twilio';
 }
 
 export class OutreachService {
-  private twilioClient: any;
   private benefitsEngine: BenefitsEngine;
+  private messagingFactory: ReturnType<typeof getMessagingFactory>;
 
   constructor() {
-    // Initialize Twilio
-    if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
-      this.twilioClient = twilio(
-        process.env.TWILIO_ACCOUNT_SID,
-        process.env.TWILIO_AUTH_TOKEN
-      );
-    }
-
-    // Initialize SendGrid
-    if (process.env.SENDGRID_API_KEY) {
-      sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-    }
-
     this.benefitsEngine = new BenefitsEngine();
+    this.messagingFactory = getMessagingFactory();
   }
 
   /**
@@ -137,7 +125,7 @@ export class OutreachService {
         if (preferences?.smsOptOut) {
           console.log(`Patient ${patient.patientId} opted out of SMS, skipping`);
         } else {
-          result = await this.sendSMS(patient.phone, message);
+          result = await this.sendSMS(campaign.practiceId, patient.phone, message);
           await this.logOutreach(campaign.id, patient.patientId, 'sms', message, patient.phone, result);
         }
       }
@@ -148,6 +136,7 @@ export class OutreachService {
           console.log(`Patient ${patient.patientId} opted out of email, skipping`);
         } else {
           result = await this.sendEmail(
+            campaign.practiceId,
             patient.email,
             message,
             patient.patientName,
@@ -166,26 +155,32 @@ export class OutreachService {
   }
 
   /**
-   * Send SMS via Twilio
+   * Send SMS via Twilio (Multi-tenant)
    */
-  private async sendSMS(phone: string, message: string): Promise<SendResult> {
+  private async sendSMS(practiceId: string, phone: string, message: string): Promise<SendResult> {
     try {
-      if (!this.twilioClient) {
+      const { client, config } = await this.messagingFactory.getTwilioClient(practiceId);
+      
+      if (!client || !config.phoneNumber) {
         console.log('Twilio not configured, simulating SMS send');
-        return { success: true, messageId: 'mock_sms_' + Date.now() };
+        return { success: true, messageId: 'mock_sms_' + Date.now(), provider: 'system' };
       }
 
       const webhookBaseUrl = process.env.WEBHOOK_BASE_URL || 'https://localhost';
-      const statusCallback = `${webhookBaseUrl}/api/webhooks/twilio`;
+      const statusCallback = `${webhookBaseUrl}/api/webhooks/twilio?practiceId=${practiceId}`;
 
-      const result = await this.twilioClient.messages.create({
+      const result = await client.messages.create({
         body: message,
-        from: process.env.TWILIO_PHONE_NUMBER,
+        from: config.phoneNumber,
         to: phone,
-        statusCallback: statusCallback, // Enable status callbacks
+        statusCallback: statusCallback, // Enable status callbacks with practice ID
       });
 
-      return { success: true, messageId: result.sid };
+      return { 
+        success: true, 
+        messageId: result.sid,
+        provider: config.provider === 'custom' ? 'custom_twilio' : 'system'
+      };
     } catch (error: any) {
       console.error('Send SMS error:', error);
       return { success: false, error: error.message };
@@ -193,9 +188,10 @@ export class OutreachService {
   }
 
   /**
-   * Send Email via SendGrid
+   * Send Email via SendGrid (Multi-tenant)
    */
   private async sendEmail(
+    practiceId: string,
     email: string,
     message: string,
     recipientName: string,
@@ -203,19 +199,21 @@ export class OutreachService {
     patientId?: string
   ): Promise<SendResult> {
     try {
-      if (!process.env.SENDGRID_API_KEY) {
+      const { client, config } = await this.messagingFactory.getSendGridClient(practiceId);
+      
+      if (!client || !config.fromEmail) {
         console.log('SendGrid not configured, simulating email send');
-        return { success: true, messageId: 'mock_email_' + Date.now() };
+        return { success: true, messageId: 'mock_email_' + Date.now(), provider: 'system' };
       }
 
       const webhookBaseUrl = process.env.WEBHOOK_BASE_URL || 'https://localhost';
-      const unsubscribeUrl = `${webhookBaseUrl}/unsubscribe?patient=${patientId}`;
+      const unsubscribeUrl = `${webhookBaseUrl}/api/preferences/unsubscribe?patient=${patientId}&type=email`;
 
       const msg: any = {
         to: email,
         from: {
-          email: process.env.SENDGRID_FROM_EMAIL || 'noreply@dentite.com',
-          name: process.env.SENDGRID_FROM_NAME || 'Dentite Benefits Tracker',
+          email: config.fromEmail,
+          name: config.fromName,
         },
         subject: 'Your Dental Benefits Are Expiring Soon',
         text: message,
@@ -240,11 +238,16 @@ export class OutreachService {
         customArgs: {
           campaignId: campaignId || '',
           patientId: patientId || '',
+          practiceId: practiceId, // Add practice ID for webhook routing
         },
       };
 
-      const result = await sgMail.send(msg);
-      return { success: true, messageId: result[0].headers['x-message-id'] };
+      const result = await client.send(msg);
+      return { 
+        success: true, 
+        messageId: result[0].headers['x-message-id'],
+        provider: config.provider === 'custom' ? 'custom_sendgrid' : 'system'
+      };
     } catch (error: any) {
       console.error('Send email error:', error);
       return { success: false, error: error.message };
@@ -285,7 +288,7 @@ export class OutreachService {
         <body>
           <div class="container">
             <div class="header">
-              <h1>ðŸ¦· Dental Benefits Alert</h1>
+              <h1>Ã°Å¸Â¦Â· Dental Benefits Alert</h1>
             </div>
             <div class="content">
               <p>Hi ${name},</p>
@@ -326,6 +329,7 @@ export class OutreachService {
           status: result.success ? 'sent' : 'failed',
           sentAt: result.success ? new Date() : null,
           externalId: result.messageId,
+          messagingProvider: result.provider || null,
           errorMessage: result.error,
         },
       });
@@ -548,7 +552,7 @@ export class OutreachService {
           console.log(`Patient ${patient.id} opted out of SMS, skipping step`);
           return;
         }
-        result = await this.sendSMS(patient.phone, message);
+        result = await this.sendSMS(state.campaign.practiceId, patient.phone, message);
         await this.logOutreachWithStep(
           state.campaign.id,
           patient.id,
@@ -565,6 +569,7 @@ export class OutreachService {
           return;
         }
         result = await this.sendEmail(
+          state.campaign.practiceId,
           patient.email,
           message,
           `${patient.firstName} ${patient.lastName}`,
@@ -741,6 +746,7 @@ export class OutreachService {
           status: result.success ? 'sent' : 'failed',
           sentAt: result.success ? new Date() : null,
           externalId: result.messageId,
+          messagingProvider: result.provider || null,
           errorMessage: result.error,
         },
       });

@@ -26,6 +26,30 @@ model Practice {
   pmsApiKey         String?
   pmsUrl            String?
   pmsConfig         Json?
+  
+  // Email Configuration (Multi-tenant messaging)
+  emailProvider           String?   @default("system") // system, custom_sendgrid
+  sendgridApiKey          String?   // Encrypted
+  sendgridFromEmail       String?
+  sendgridFromName        String?
+  sendgridDomainId        String?
+  emailDomainVerified     Boolean   @default(false)
+  emailVerificationStatus String?   // pending, verified, failed
+  emailDnsRecords         Json?     // DNS records for verification
+  emailFallbackEnabled    Boolean   @default(true)
+  
+  // SMS Configuration (Multi-tenant messaging)
+  smsProvider             String?   @default("system") // system, custom_twilio
+  twilioAccountSid        String?   // Encrypted
+  twilioAuthToken         String?   // Encrypted
+  twilioPhoneNumber       String?
+  smsVerificationStatus   String?   // pending, verified, failed
+  smsFallbackEnabled      Boolean   @default(true)
+  
+  // Last tested/validated
+  emailLastTestedAt       DateTime?
+  smsLastTestedAt         DateTime?
+  
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -195,6 +219,7 @@ model OutreachLog {
   clickCount      Int      @default(0) // Number of link clicks
   openCount       Int      @default(0) // Number of opens
   webhookEvents   Json?    // Raw webhook event log
+  messagingProvider String? // system, custom_sendgrid, custom_twilio
   errorMessage    String?
   externalId      String?  // Twilio/SendGrid message ID
   createdAt       DateTime @default(now())

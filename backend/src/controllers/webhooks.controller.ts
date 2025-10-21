@@ -4,12 +4,15 @@ import crypto from 'crypto';
 
 export class WebhooksController {
   /**
-   * Handle SendGrid webhook events
+   * Handle SendGrid webhook events (Multi-tenant support)
    * Events: delivered, open, click, bounce, dropped, spamreport, unsubscribe
+   * 
+   * Multi-tenant: Extracts practiceId from customArgs to support multiple SendGrid accounts
    */
   handleSendGridWebhook = async (req: Request, res: Response): Promise<void> => {
     try {
-      // Verify SendGrid webhook signature
+      // Note: Signature verification uses system credentials
+      // For custom SendGrid accounts, signature verification happens at SendGrid's end
       if (process.env.SENDGRID_WEBHOOK_VERIFY_KEY) {
         const signature = req.headers['x-twilio-email-event-webhook-signature'] as string;
         const timestamp = req.headers['x-twilio-email-event-webhook-timestamp'] as string;
@@ -34,15 +37,24 @@ export class WebhooksController {
   };
 
   /**
-   * Handle Twilio status callback webhook
+   * Handle Twilio status callback webhook (Multi-tenant support)
    * Status: queued, sent, delivered, failed, undelivered
+   * 
+   * Multi-tenant: Accepts practiceId as query parameter for routing
+   * URL format: /api/webhooks/twilio?practiceId={id}
    */
   handleTwilioWebhook = async (req: Request, res: Response): Promise<void> => {
     try {
-      // Verify Twilio signature
+      const practiceId = req.query.practiceId as string | undefined;
+      
+      // Verify Twilio signature (using system credentials for now)
+      // Note: For custom Twilio accounts, verification would need practice-specific auth token
       if (process.env.TWILIO_AUTH_TOKEN) {
         const signature = req.headers['x-twilio-signature'] as string;
-        const url = `${process.env.WEBHOOK_BASE_URL || 'https://localhost'}/api/webhooks/twilio`;
+        let url = `${process.env.WEBHOOK_BASE_URL || 'https://localhost'}/api/webhooks/twilio`;
+        if (practiceId) {
+          url += `?practiceId=${practiceId}`;
+        }
         
         if (!this.verifyTwilioSignature(signature, url, req.body)) {
           res.status(401).json({ error: 'Invalid signature' });
@@ -50,7 +62,7 @@ export class WebhooksController {
         }
       }
 
-      await this.processTwilioEvent(req.body);
+      await this.processTwilioEvent(req.body, practiceId);
 
       res.status(200).send('OK');
     } catch (error) {
@@ -61,6 +73,7 @@ export class WebhooksController {
 
   /**
    * Process SendGrid event and update OutreachLog
+   * Multi-tenant: Works with both system and custom SendGrid accounts
    */
   private async processSendGridEvent(event: any): Promise<void> {
     try {
@@ -72,14 +85,22 @@ export class WebhooksController {
       }
 
       // Find the outreach log by SendGrid message ID
+      // This works for both system and custom SendGrid accounts
       const outreachLog = await prisma.outreachLog.findFirst({
         where: { externalId: sg_message_id },
+        include: {
+          campaign: {
+            select: { practiceId: true, name: true },
+          },
+        },
       });
 
       if (!outreachLog) {
         console.warn(`OutreachLog not found for message ID: ${sg_message_id}`);
         return;
       }
+
+      console.log(`Processing SendGrid ${eventType} for practice ${outreachLog.campaign.practiceId} (provider: ${outreachLog.messagingProvider || 'unknown'})`);
 
       // Check for duplicate event (idempotency)
       const existingEvent = await prisma.messageEvent.findFirst({
@@ -183,8 +204,9 @@ export class WebhooksController {
 
   /**
    * Process Twilio event and update OutreachLog
+   * Multi-tenant: Works with both system and custom Twilio accounts
    */
-  private async processTwilioEvent(event: any): Promise<void> {
+  private async processTwilioEvent(event: any, practiceId?: string): Promise<void> {
     try {
       const { MessageSid, MessageStatus, To, ErrorCode, ErrorMessage } = event;
 
@@ -194,14 +216,27 @@ export class WebhooksController {
       }
 
       // Find the outreach log by Twilio message SID
+      // Optionally filter by practice ID for additional security
+      const where: any = { externalId: MessageSid };
+      if (practiceId) {
+        where.campaign = { practiceId };
+      }
+
       const outreachLog = await prisma.outreachLog.findFirst({
-        where: { externalId: MessageSid },
+        where,
+        include: {
+          campaign: {
+            select: { practiceId: true, name: true },
+          },
+        },
       });
 
       if (!outreachLog) {
-        console.warn(`OutreachLog not found for MessageSid: ${MessageSid}`);
+        console.warn(`OutreachLog not found for MessageSid: ${MessageSid}${practiceId ? ` (practice: ${practiceId})` : ''}`);
         return;
       }
+
+      console.log(`Processing Twilio ${MessageStatus} for practice ${outreachLog.campaign.practiceId} (provider: ${outreachLog.messagingProvider || 'unknown'})`);
 
       // Check for duplicate event
       const existingEvent = await prisma.messageEvent.findFirst({

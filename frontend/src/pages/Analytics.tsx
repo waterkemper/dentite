@@ -95,7 +95,7 @@ export const Analytics = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="card p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -132,6 +132,19 @@ export const Analytics = () => {
               </p>
             </div>
             <TrendingUp className="w-10 h-10 text-warning" />
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Messaging Provider</p>
+              <p className="text-lg font-bold text-gray-900 mt-2">
+                System Default
+              </p>
+              <a href="/settings" className="text-xs text-blue-600 hover:underline">Configure →</a>
+            </div>
+            <BarChart3 className="w-10 h-10 text-gray-400" />
           </div>
         </div>
       </div>
