@@ -19,7 +19,7 @@ You're getting "System Twilio not configured (credentials missing)" because:
 
 2. **Update your SMS configuration**:
    - Go to Settings > SMS Configuration
-   - Enter your real Twilio Account SID (e.g., `AC1234567890abcdef1234567890abcdef`)
+   - Enter your real Twilio Account SID (e.g., `ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`)
    - Enter your real Twilio Auth Token
    - Enter your Twilio phone number (e.g., `+1234567890`)
    - Save and test
@@ -54,16 +54,16 @@ After fixing your credentials:
 
 ## Valid Twilio Credentials Format
 
-- **Account SID**: `AC` followed by 32 characters (e.g., `AC1234567890abcdef1234567890abcdef`)
+- **Account SID**: `AC` followed by 32 characters (e.g., `ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`)
 - **Auth Token**: 32-character string (e.g., `your_auth_token_here_32_chars`)
 - **Phone Number**: E.164 format (e.g., `+1234567890`)
 
 ## Common Issues
 
-❌ **Invalid credentials**: `admin@dentalpractice.com` is not a valid Account SID  
-❌ **Wrong format**: Account SID must start with `AC`  
-❌ **Missing phone**: You need a Twilio phone number to send SMS  
-❌ **Invalid phone format**: Must be in E.164 format (`+1234567890`)  
+â�Œ **Invalid credentials**: `admin@dentalpractice.com` is not a valid Account SID  
+â�Œ **Wrong format**: Account SID must start with `AC`  
+â�Œ **Missing phone**: You need a Twilio phone number to send SMS  
+â�Œ **Invalid phone format**: Must be in E.164 format (`+1234567890`)  
 
 ## Need Help?
 
@@ -73,5 +73,5 @@ After fixing your credentials:
 
 ---
 
-**Status**: ✅ Ready to fix  
+**Status**: âœ… Ready to fix  
 **Last Updated**: January 21, 2025

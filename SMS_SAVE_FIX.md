@@ -48,8 +48,8 @@ After saving SMS configuration, the form fields were reverting to old values bec
 1. **Go to Settings > SMS Configuration**
 2. **Select "Use Custom Twilio Account"**
 3. **Enter your credentials**:
-   - Account SID: `AC562132cd2e45a34e22c5dd9c3910a554`
-   - Auth Token: `51ad7709393bf21a28d0f34c930ff58f`
+   - Account SID: `ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
+   - Auth Token: `your_auth_token_here`
    - Phone Number: `+15672296814`
 4. **Click "Save Configuration"**
 5. **Verify**: Form should show success message and maintain phone number

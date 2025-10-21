@@ -2,14 +2,14 @@
 
 ## The Problem
 After saving SMS configuration with valid Twilio credentials:
-- HTTP 200 success response ✅
-- "SMS configuration saved successfully" message ✅  
-- Form reverts to old value `admin@dentalpractice.com` ❌
+- HTTP 200 success response âœ…
+- "SMS configuration saved successfully" message âœ…  
+- Form reverts to old value `admin@dentalpractice.com` â�Œ
 
 ## Debugging Steps
 
 ### 1. Open Browser Developer Tools
-1. **Press F12** or right-click → "Inspect"
+1. **Press F12** or right-click â†’ "Inspect"
 2. **Go to Console tab**
 3. **Clear the console** (click the clear button)
 
@@ -17,15 +17,15 @@ After saving SMS configuration with valid Twilio credentials:
 1. **Go to Settings > SMS Configuration**
 2. **Select "Use Custom Twilio Account"**
 3. **Enter your credentials**:
-   - Account SID: `AC562132cd2e45a34e22c5dd9c3910a554`
-   - Auth Token: `51ad7709393bf21a28d0f34c930ff58f`
+   - Account SID: `ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
+   - Auth Token: `your_auth_token_here`
    - Phone Number: `+15672296814`
 4. **Click "Save Configuration"**
 
 ### 3. Check Console Logs
 Look for these console messages:
-- `"Twilio SID changed: AC562132cd2e45a34e22c5dd9c3910a554"`
-- `"Twilio Token changed: 51ad7709393bf21a28d0f34c930ff58f"`
+- `"Twilio SID changed: ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"`
+- `"Twilio Token changed: your_auth_token_here"`
 - `"Form state after save: { twilioAccountSid: '', twilioAuthToken: '', ... }"`
 
 ### 4. What to Look For
@@ -88,5 +88,5 @@ If the debugging shows the form is working correctly but still reverting:
 
 ---
 
-**Status**: 🔍 Ready for debugging  
+**Status**: ðŸ”� Ready for debugging  
 **Last Updated**: January 21, 2025
