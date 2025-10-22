@@ -13,6 +13,7 @@ export class AuthController {
     this.requestPasswordReset = this.requestPasswordReset.bind(this);
     this.verifyResetToken = this.verifyResetToken.bind(this);
     this.resetPassword = this.resetPassword.bind(this);
+    this.updateProfile = this.updateProfile.bind(this);
   }
 
   /**
@@ -347,6 +348,110 @@ export class AuthController {
     } catch (error) {
       console.error('Password reset error:', error);
       res.status(500).json({ error: 'Failed to reset password' });
+    }
+  }
+
+  /**
+   * Update user profile
+   */
+  async updateProfile(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      const { firstName, lastName, email, currentPassword, newPassword } = req.body;
+
+      // Get current user
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { practice: true },
+      });
+
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      // Check if email is being changed and if it's already taken
+      if (email && email !== user.email) {
+        const existingUser = await prisma.user.findUnique({
+          where: { email },
+        });
+
+        if (existingUser) {
+          res.status(400).json({ error: 'Email already in use' });
+          return;
+        }
+      }
+
+      // Prepare update data
+      const updateData: any = {};
+
+      if (firstName) updateData.firstName = firstName;
+      if (lastName) updateData.lastName = lastName;
+      if (email) updateData.email = email;
+
+      // Handle password change
+      if (newPassword) {
+        if (!currentPassword) {
+          res.status(400).json({ error: 'Current password is required to set a new password' });
+          return;
+        }
+
+        // Verify current password
+        const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+        if (!isValidPassword) {
+          res.status(400).json({ error: 'Current password is incorrect' });
+          return;
+        }
+
+        // Validate new password
+        if (newPassword.length < 8) {
+          res.status(400).json({ error: 'New password must be at least 8 characters' });
+          return;
+        }
+
+        // Hash new password
+        updateData.password = await bcrypt.hash(newPassword, 10);
+      }
+
+      // Update user
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: updateData,
+        include: { practice: true },
+      });
+
+      // Generate new token if email changed (for JWT consistency)
+      let token;
+      if (email && email !== user.email) {
+        token = this.generateToken(updatedUser);
+      }
+
+      res.json({
+        message: 'Profile updated successfully',
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+          role: updatedUser.role,
+          practiceId: updatedUser.practiceId,
+          practice: {
+            id: updatedUser.practice.id,
+            name: updatedUser.practice.name,
+            subscriptionStatus: updatedUser.practice.subscriptionStatus,
+          },
+        },
+        ...(token && { token }), // Include new token if email changed
+      });
+    } catch (error) {
+      console.error('Profile update error:', error);
+      res.status(500).json({ error: 'Failed to update profile' });
     }
   }
 

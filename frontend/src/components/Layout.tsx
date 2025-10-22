@@ -12,7 +12,8 @@ import {
   ChevronDown,
   Building2,
   CreditCard,
-  HelpCircle
+  HelpCircle,
+  UserCircle
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
@@ -142,6 +143,15 @@ export const Layout = () => {
 
                         {/* Settings Links */}
                         <Link
+                          to="/app/profile"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        >
+                          <UserCircle className="w-4 h-4 mr-3 text-gray-500" />
+                          Profile Settings
+                        </Link>
+
+                        <Link
                           to="/app/settings"
                           onClick={() => setUserMenuOpen(false)}
                           className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
@@ -149,18 +159,6 @@ export const Layout = () => {
                           <Settings className="w-4 h-4 mr-3 text-gray-500" />
                           Practice Settings
                         </Link>
-
-                        {/* Future: Add more settings links here */}
-                        {/* 
-                        <Link
-                          to="/profile"
-                          onClick={() => setUserMenuOpen(false)}
-                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          <User className="w-4 h-4 mr-3 text-gray-500" />
-                          My Profile
-                        </Link>
-                        */}
 
                         {/* Logout */}
                         <div className="border-t border-gray-100 mt-1 pt-1">
@@ -228,7 +226,20 @@ export const Layout = () => {
                 );
               })}
 
-              {/* Settings Link */}
+              {/* Settings Links */}
+              <Link
+                to="/app/profile"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center px-3 py-2 text-base font-medium rounded-md ${
+                  isActive('/app/profile')
+                    ? 'bg-primary text-white'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <UserCircle className="w-5 h-5 mr-3" />
+                Profile Settings
+              </Link>
+
               <Link
                 to="/app/settings"
                 onClick={() => setMobileMenuOpen(false)}
@@ -239,7 +250,7 @@ export const Layout = () => {
                 }`}
               >
                 <Settings className="w-5 h-5 mr-3" />
-                Settings
+                Practice Settings
               </Link>
 
               {/* Logout */}

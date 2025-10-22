@@ -94,7 +94,7 @@ export const Home = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <span className="text-2xl font-bold text-primary">ðŸ¦· Dentite</span>
+              <span className="text-2xl font-bold text-primary">🦷 Dentite</span>
             </div>
             <div className="flex items-center space-x-4">
               <Link
@@ -322,7 +322,7 @@ export const Home = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="col-span-1 md:col-span-2">
               <div className="flex items-center mb-4">
-                <span className="text-2xl font-bold text-white">ðŸ¦· Dentite</span>
+                <span className="text-2xl font-bold text-white">🦷 Dentite</span>
               </div>
               <p className="text-gray-400 mb-4">
                 Helping dental practices prevent revenue loss from expiring insurance benefits 

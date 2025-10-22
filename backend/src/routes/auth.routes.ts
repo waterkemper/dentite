@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { body } from 'express-validator';
 import { AuthController } from '../controllers/auth.controller';
 import { validateRequest } from '../middleware/validateRequest';
+import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
 const authController = new AuthController();
@@ -79,6 +80,30 @@ router.post(
   ],
   validateRequest,
   authController.resetPassword
+);
+
+/**
+ * PUT /api/auth/profile
+ * Update user profile
+ */
+router.put(
+  '/profile',
+  authenticateToken,
+  [
+    body('firstName').optional().notEmpty().withMessage('First name cannot be empty'),
+    body('lastName').optional().notEmpty().withMessage('Last name cannot be empty'),
+    body('email').optional().isEmail().withMessage('Valid email is required'),
+    body('newPassword')
+      .optional()
+      .isLength({ min: 8 })
+      .withMessage('New password must be at least 8 characters'),
+    body('currentPassword')
+      .if(body('newPassword').exists())
+      .notEmpty()
+      .withMessage('Current password is required when changing password'),
+  ],
+  validateRequest,
+  authController.updateProfile
 );
 
 export default router;

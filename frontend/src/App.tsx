@@ -16,6 +16,7 @@ import { Outreach } from './pages/Outreach';
 import { Analytics } from './pages/Analytics';
 import { OutreachEdit } from './pages/OutreachEdit';
 import PracticeSettings from './pages/PracticeSettings';
+import ProfileSettings from './pages/ProfileSettings';
 import Billing from './pages/Billing';
 
 function App() {
@@ -49,6 +50,7 @@ function App() {
             <Route path="analytics" element={<Analytics />} />
             <Route path="billing" element={<Billing />} />
             <Route path="settings" element={<PracticeSettings />} />
+            <Route path="profile" element={<ProfileSettings />} />
             <Route path="help" element={<Help />} />
           </Route>
         </Routes>
