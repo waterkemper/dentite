@@ -46,5 +46,40 @@ router.post(
  */
 router.get('/me', authController.getCurrentUser);
 
+/**
+ * POST /api/auth/forgot-password
+ * Request password reset
+ */
+router.post(
+  '/forgot-password',
+  [
+    body('email').isEmail().withMessage('Valid email is required'),
+  ],
+  validateRequest,
+  authController.requestPasswordReset
+);
+
+/**
+ * GET /api/auth/verify-reset-token/:token
+ * Verify password reset token
+ */
+router.get('/verify-reset-token/:token', authController.verifyResetToken);
+
+/**
+ * POST /api/auth/reset-password
+ * Reset password with token
+ */
+router.post(
+  '/reset-password',
+  [
+    body('token').notEmpty().withMessage('Reset token is required'),
+    body('newPassword')
+      .isLength({ min: 8 })
+      .withMessage('Password must be at least 8 characters'),
+  ],
+  validateRequest,
+  authController.resetPassword
+);
+
 export default router;
 

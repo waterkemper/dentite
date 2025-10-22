@@ -1,4 +1,6 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { api } from '../lib/api';
 import { 
   TrendingUp, 
   MessageSquare, 
@@ -13,7 +15,36 @@ import {
   Clock
 } from 'lucide-react';
 
+interface PricingPlan {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  billingInterval: string;
+  features: string[];
+  description: string;
+  recommended: boolean;
+  stripePriceId?: string;
+}
+
 export const Home = () => {
+  const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>([]);
+  const [loadingPricing, setLoadingPricing] = useState(true);
+
+  useEffect(() => {
+    const fetchPricing = async () => {
+      try {
+        const response = await api.get('/pricing/plans');
+        setPricingPlans(response.data);
+      } catch (error) {
+        console.error('Error fetching pricing:', error);
+      } finally {
+        setLoadingPricing(false);
+      }
+    };
+
+    fetchPricing();
+  }, []);
   const features = [
     {
       icon: Database,
@@ -63,7 +94,7 @@ export const Home = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <span className="text-2xl font-bold text-primary">🦷 Dentite</span>
+              <span className="text-2xl font-bold text-primary">ðŸ¦· Dentite</span>
             </div>
             <div className="flex items-center space-x-4">
               <Link
@@ -187,7 +218,7 @@ export const Home = () => {
 
       {/* Pricing Section */}
       <section className="bg-white py-20">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
               Simple, Transparent Pricing
@@ -197,49 +228,69 @@ export const Home = () => {
             </p>
           </div>
           
-          <div className="bg-white rounded-lg shadow-xl p-8 text-gray-900 border border-gray-200">
-            <div className="text-center mb-8">
-              <div className="text-5xl font-bold text-primary mb-2">
-                $200-300
-                <span className="text-2xl text-gray-600 font-normal">/month</span>
+          {loadingPricing ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+              <p className="text-gray-600 mt-4">Loading pricing plans...</p>
+            </div>
+          ) : pricingPlans.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {pricingPlans.map((plan) => (
+                <div
+                  key={plan.id}
+                  className={`bg-white rounded-lg shadow-xl p-8 text-gray-900 border-2 relative flex flex-col ${
+                    plan.recommended ? 'border-primary' : 'border-gray-200'
+                  }`}
+                >
+                  {plan.recommended && (
+                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                      <span className="bg-primary text-white px-3 py-1 rounded-full text-sm font-medium">
+                        Most Popular
+                      </span>
+                    </div>
+                  )}
+                  
+                  <div className="text-center mb-6">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
+                    <p className="text-gray-600 text-sm mb-4">{plan.description}</p>
+                    <div className="text-4xl font-bold text-primary mb-2">
+                      ${plan.price}
+                      <span className="text-xl text-gray-600 font-normal">/{plan.billingInterval}</span>
+                    </div>
+                  </div>
+                  
+                  <ul className="space-y-3 mb-8 flex-grow">
+                    {plan.features.map((feature, index) => (
+                      <li key={index} className="flex items-start">
+                        <CheckCircle className="w-5 h-5 text-success mr-3 flex-shrink-0 mt-0.5" />
+                        <span className="text-sm">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  
+                  <div className="text-center mt-auto">
+                    <Link
+                      to="/register"
+                      className="btn btn-primary text-lg px-6 py-3 w-full text-center inline-flex items-center justify-center"
+                    >
+                      Get Started
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow-xl p-8 text-gray-900 border border-gray-200 max-w-2xl mx-auto">
+              <div className="text-center">
+                <p className="text-gray-600 mb-6">Contact us for custom pricing tailored to your practice needs.</p>
+                <Link to="/register" className="btn btn-primary text-lg px-8 py-3 min-w-[200px] text-center inline-flex items-center justify-center">
+                  Get Started
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Link>
               </div>
-              <p className="text-gray-600">per practice</p>
             </div>
-            
-            <ul className="space-y-4 mb-8 max-w-md mx-auto">
-              <li className="flex items-center">
-                <CheckCircle className="w-5 h-5 text-success mr-3" />
-                <span>Unlimited patient tracking</span>
-              </li>
-              <li className="flex items-center">
-                <CheckCircle className="w-5 h-5 text-success mr-3" />
-                <span>Automated SMS & Email campaigns</span>
-              </li>
-              <li className="flex items-center">
-                <CheckCircle className="w-5 h-5 text-success mr-3" />
-                <span>Real-time analytics dashboard</span>
-              </li>
-              <li className="flex items-center">
-                <CheckCircle className="w-5 h-5 text-success mr-3" />
-                <span>PMS integration (OpenDental, Ortho2Edge)</span>
-              </li>
-              <li className="flex items-center">
-                <CheckCircle className="w-5 h-5 text-success mr-3" />
-                <span>HIPAA-compliant security</span>
-              </li>
-              <li className="flex items-center">
-                <CheckCircle className="w-5 h-5 text-success mr-3" />
-                <span>Priority support</span>
-              </li>
-            </ul>
-            
-            <div className="text-center">
-              <Link to="/register" className="btn btn-primary text-lg px-8 py-3 min-w-[200px] text-center inline-flex items-center justify-center">
-                Start Free Trial
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Link>
-            </div>
-          </div>
+          )}
         </div>
       </section>
 
@@ -271,7 +322,7 @@ export const Home = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="col-span-1 md:col-span-2">
               <div className="flex items-center mb-4">
-                <span className="text-2xl font-bold text-white">🦷 Dentite</span>
+                <span className="text-2xl font-bold text-white">ðŸ¦· Dentite</span>
               </div>
               <p className="text-gray-400 mb-4">
                 Helping dental practices prevent revenue loss from expiring insurance benefits 

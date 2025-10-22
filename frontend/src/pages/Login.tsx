@@ -40,7 +40,7 @@ export const Login = () => {
         </div>
         
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-primary mb-2">🦷 Dentite</h1>
+          <h1 className="text-4xl font-bold text-primary mb-2">ðŸ¦· Dentite</h1>
           <p className="text-gray-600">Dental Benefits Tracker</p>
         </div>
 
@@ -68,14 +68,22 @@ export const Login = () => {
             </div>
 
             <div>
-              <label className="label">Password</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="label">Password</label>
+                <Link 
+                  to="/forgot-password" 
+                  className="text-sm text-primary hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <input
                 type="password"
                 className="input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                placeholder="••••••••"
+                placeholder="********"
               />
             </div>
 

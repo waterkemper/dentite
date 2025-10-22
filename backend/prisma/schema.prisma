@@ -86,16 +86,18 @@ model Practice {
 }
 
 model User {
-  id            String   @id @default(uuid())
-  practiceId    String
-  email         String   @unique
-  password      String
-  firstName     String
-  lastName      String
-  role          String   @default("staff") // admin, staff
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                    String   @id @default(uuid())
+  practiceId            String
+  email                 String   @unique
+  password              String
+  firstName             String
+  lastName              String
+  role                  String   @default("staff") // admin, staff
+  isActive              Boolean  @default(true)
+  passwordResetToken    String?  @unique
+  passwordResetExpires  DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   practice      Practice @relation(fields: [practiceId], references: [id], onDelete: Cascade)
 
